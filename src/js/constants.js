@@ -4,7 +4,7 @@ export const STORAGE_KEYS = {
 }
 
 export const DEFAULTS = {
-  mode: import.meta.env.VITE_DEFAULT_MODE || '',
+  mode: import.meta.env.VITE_DEFAULT_MODE || 'free',
   theme: 'dark',
   conversations: [],
   currentId: null,
