@@ -199,19 +199,27 @@ function bindDropdownItem(item) {
           updateProviderUI()
           saveState()
         })
-        el['provider-dropdown'].hidden = true
+        el['provider-dropdown'].classList.add('hidden')
         return
       }
       state.provider = providerId
     }
     updateProviderUI()
     saveState()
-    el['provider-dropdown'].hidden = true
+    el['provider-dropdown'].classList.add('hidden')
   })
 }
 
+function showModal(modal) {
+  modal.classList.remove('hidden')
+}
+
+function hideModal(modal) {
+  modal.classList.add('hidden')
+}
+
 function showCostModal(onAccept) {
-  el['cost-modal'].hidden = false
+  showModal(el['cost-modal'])
   el['dont-show-again'].checked = false
 
   const handleAccept = () => {
@@ -219,14 +227,14 @@ function showCostModal(onAccept) {
       state.costWarningDismissed = true
       saveState()
     }
-    el['cost-modal'].hidden = true
+    hideModal(el['cost-modal'])
     el['cost-modal-accept'].removeEventListener('click', handleAccept)
     el['cost-modal-cancel'].removeEventListener('click', handleCancel)
     onAccept?.()
   }
 
   const handleCancel = () => {
-    el['cost-modal'].hidden = true
+    hideModal(el['cost-modal'])
     el['cost-modal-accept'].removeEventListener('click', handleAccept)
     el['cost-modal-cancel'].removeEventListener('click', handleCancel)
     if (state.mode === 'pro') doSetMode('free')
@@ -611,19 +619,19 @@ async function start() {
       e.stopPropagation()
       const dd = el['provider-dropdown']
       if (!dd) return
-      if (dd.hidden) {
+      if (dd.classList.contains('hidden')) {
         const rect = el['provider-selector'].getBoundingClientRect()
         dd.style.position = 'fixed'
         dd.style.top = (rect.bottom + 4) + 'px'
         dd.style.left = rect.left + 'px'
         dd.style.minWidth = Math.max(rect.width, 220) + 'px'
       }
-      dd.hidden = !dd.hidden
+      dd.classList.toggle('hidden')
     })
   }
 
   document.addEventListener('click', () => {
-    if (el['provider-dropdown']) el['provider-dropdown'].hidden = true
+    if (el['provider-dropdown']) el['provider-dropdown'].classList.add('hidden')
   })
 
   // --- Theme toggle ---
@@ -647,13 +655,13 @@ async function start() {
     el['settings-btn'].addEventListener('click', () => {
       closeSidebar()
       loadSettingsIntoUI()
-      if (el['settings-modal']) el['settings-modal'].hidden = false
+      showModal(el['settings-modal'])
     })
   }
 
   if (el['settings-close']) {
     el['settings-close'].addEventListener('click', () => {
-      if (el['settings-modal']) el['settings-modal'].hidden = true
+      hideModal(el['settings-modal'])
     })
   }
 
@@ -667,7 +675,7 @@ async function start() {
 
       setSettingsOverrides(overrides)
       localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(overrides))
-      if (el['settings-modal']) el['settings-modal'].hidden = true
+      hideModal(el['settings-modal'])
 
       const btn = el['settings-save']
       const original = btn.textContent
@@ -708,7 +716,7 @@ async function start() {
   $$('.modal-overlay').forEach(modal => {
     modal.addEventListener('click', e => {
       if (e.target === modal || e.target.classList.contains('modal-backdrop')) {
-        modal.hidden = true
+        hideModal(modal)
       }
     })
   })
@@ -720,7 +728,7 @@ async function start() {
       el['message-input'].style.height = Math.min(el['message-input'].scrollHeight, UI.maxInputHeight) + 'px'
       if (el['send-btn']) {
         const hasText = el['message-input'].value.trim().length > 0
-        el['send-btn'].disabled = !hasText && currentFiles.length === 0 || state.sending
+        el['send-btn'].disabled = (!hasText && currentFiles.length === 0) || state.sending
       }
     })
 
@@ -736,16 +744,27 @@ async function start() {
     el['send-btn'].addEventListener('click', sendMessage)
   }
 
+  // --- Escape key closes modals ---
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (!el['settings-modal']?.classList.contains('hidden')) {
+        hideModal(el['settings-modal'])
+      }
+      if (!el['cost-modal']?.classList.contains('hidden')) {
+        hideModal(el['cost-modal'])
+      }
+    }
+  })
+
   // --- Suggestion chips ---
   el.suggestionChips.forEach(chip => {
     chip.addEventListener('click', () => {
       if (el['message-input']) {
         el['message-input'].value = chip.dataset.prompt
-        el['message-input'].style.height = 'auto'
-        el['message-input'].style.height = Math.min(el['message-input'].scrollHeight, UI.maxInputHeight) + 'px'
+        el['message-input'].dispatchEvent(new Event('input', { bubbles: true }))
       }
-      if (el['send-btn']) el['send-btn'].disabled = false
       el['message-input']?.focus()
+      sendMessage()
     })
   })
 

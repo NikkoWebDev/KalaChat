@@ -2,21 +2,29 @@
 ---
 
 <div id="messages-container" class="flex-1 overflow-y-auto overflow-x-hidden flex flex-col scroll-smooth relative">
-  <div id="empty-state" class="flex flex-col items-center justify-center flex-1 px-6 py-8 text-center animate-fade-in">
-    <div class="mb-5 text-surface-200/60">
-      <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-        <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="1.5" stroke-opacity="0.15"/>
-        <path d="M32 20v16M24 28h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-opacity="0.3"/>
-        <text x="32" y="40" font-family="Instrument Serif, Georgia, serif" font-size="20" fill="currentColor" text-anchor="middle" opacity="0.4">K</text>
-      </svg>
+  <div id="empty-state" class="flex flex-col items-center justify-center flex-1 px-8 py-10 text-center">
+    <div class="mb-6 opacity-0" style="animation:fadeIn .6s ease .1s forwards">
+      <div class="relative w-20 h-20 mx-auto">
+        <svg width="80" height="80" viewBox="0 0 80 80" fill="none" class="w-full h-full">
+          <rect x="4" y="4" width="72" height="72" rx="20" stroke="currentColor" stroke-width="1" stroke-opacity="0.08"/>
+          <rect x="4" y="4" width="72" height="72" rx="20" stroke="url(#g)" stroke-width="1" stroke-opacity="0.3"/>
+          <text x="40" y="50" font-family="'Instrument Serif','Georgia',serif" font-size="28" fill="currentColor" text-anchor="middle" opacity="0.3">K</text>
+          <defs>
+            <linearGradient id="g" x1="0" y1="0" x2="80" y2="80">
+              <stop offset="0%" stop-color="#C8A87C"/>
+              <stop offset="100%" stop-color="#C8A87C" stop-opacity="0.1"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
     </div>
-    <h2 class="font-display text-2xl font-normal text-surface-100 mb-2 tracking-tight lg:text-[28px]">¿En qué puedo ayudarte?</h2>
-    <p class="text-sm text-surface-200 mb-7 leading-relaxed">Pregúntame lo que sea, estoy aquí para ti</p>
-    <div class="flex flex-wrap justify-center gap-2 max-w-[360px]">
-      <button class="suggestion-chip px-4 py-2 rounded-full text-sm text-surface-200 border border-surface-700 bg-surface-400 hover:bg-gold/10 hover:border-gold hover:text-gold transition-all duration-250 whitespace-nowrap" data-prompt="Explica un concepto complejo de forma sencilla">Explica algo complejo</button>
-      <button class="suggestion-chip px-4 py-2 rounded-full text-sm text-surface-200 border border-surface-700 bg-surface-400 hover:bg-gold/10 hover:border-gold hover:text-gold transition-all duration-250 whitespace-nowrap" data-prompt="Ayúdame a escribir un correo profesional">Redacta un correo</button>
-      <button class="suggestion-chip px-4 py-2 rounded-full text-sm text-surface-200 border border-surface-700 bg-surface-400 hover:bg-gold/10 hover:border-gold hover:text-gold transition-all duration-250 whitespace-nowrap" data-prompt="Traduce este texto al inglés">Traduce un texto</button>
-      <button class="suggestion-chip px-4 py-2 rounded-full text-sm text-surface-200 border border-surface-700 bg-surface-400 hover:bg-gold/10 hover:border-gold hover:text-gold transition-all duration-250 whitespace-nowrap" data-prompt="Dame ideas creativas para un proyecto">Ideas creativas</button>
+    <h2 class="font-display text-3xl font-normal text-surface-100 mb-2.5 tracking-tight opacity-0 lg:text-[34px]" style="animation:fadeIn .6s ease .2s forwards">¿En qué puedo ayudarte?</h2>
+    <p class="text-sm text-surface-200 mb-8 leading-relaxed opacity-0" style="animation:fadeIn .6s ease .3s forwards">Pregúntame lo que sea, estoy aquí para ti</p>
+    <div class="flex flex-wrap justify-center gap-2 max-w-[380px]">
+      <button class="suggestion-chip px-4 py-2 rounded-full text-sm text-surface-200 border border-surface-700 bg-surface-400/50 hover:bg-gold/10 hover:border-gold hover:text-gold transition-all duration-250 whitespace-nowrap opacity-0" style="animation:fadeIn .5s ease .4s forwards" data-prompt="Explica un concepto complejo de forma sencilla">Explica algo complejo</button>
+      <button class="suggestion-chip px-4 py-2 rounded-full text-sm text-surface-200 border border-surface-700 bg-surface-400/50 hover:bg-gold/10 hover:border-gold hover:text-gold transition-all duration-250 whitespace-nowrap opacity-0" style="animation:fadeIn .5s ease .5s forwards" data-prompt="Ayúdame a escribir un correo profesional">Redacta un correo</button>
+      <button class="suggestion-chip px-4 py-2 rounded-full text-sm text-surface-200 border border-surface-700 bg-surface-400/50 hover:bg-gold/10 hover:border-gold hover:text-gold transition-all duration-250 whitespace-nowrap opacity-0" style="animation:fadeIn .5s ease .6s forwards" data-prompt="Traduce este texto al inglés">Traduce un texto</button>
+      <button class="suggestion-chip px-4 py-2 rounded-full text-sm text-surface-200 border border-surface-700 bg-surface-400/50 hover:bg-gold/10 hover:border-gold hover:text-gold transition-all duration-250 whitespace-nowrap opacity-0" style="animation:fadeIn .5s ease .7s forwards" data-prompt="Dame ideas creativas para un proyecto">Ideas creativas</button>
     </div>
   </div>
 
