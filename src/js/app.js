@@ -23,7 +23,7 @@ function cacheElements() {
     'messages-container', 'empty-state', 'message-input', 'send-btn',
     'header', 'theme-btn', 'provider-selector', 'provider-dropdown',
     'provider-label', 'provider-badge', 'dropdown-free-group',
-    'dropdown-pro-group', 'dropdown-divider', 'cost-modal',
+    'cost-modal',
     'cost-modal-accept', 'cost-modal-cancel', 'dont-show-again',
     'conversation-list', 'new-chat-btn-side', 'settings-btn',
     'settings-modal', 'settings-close', 'settings-save',
@@ -154,9 +154,6 @@ function buildDropdown() {
         </button>`
     }).join('')
   }
-
-  if (el['dropdown-pro-group']) el['dropdown-pro-group'].innerHTML = ''
-  if (el['dropdown-divider']) el['dropdown-divider'].style.display = 'none'
 
   el['dropdown-free-group']?.querySelectorAll('.dropdown-item').forEach(bindDropdownItem)
 }
