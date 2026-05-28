@@ -2,11 +2,15 @@
 ---
 
 <div id="input-area" class="shrink-0 px-3 pt-1.5 pb-[calc(6px+env(safe-area-inset-bottom,0px))] bg-surface border-t border-surface-800 relative lg:px-6 lg:pt-2 lg:pb-[calc(8px+env(safe-area-inset-bottom,0px))]">
-  <div class="flex items-center mb-1.5 px-1">
+  <div class="flex items-center justify-between mb-1.5 px-1">
     <button id="provider-selector" class="provider-btn flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium text-surface-200 hover:bg-gold/10 hover:text-gold transition-all duration-200" aria-label="Seleccionar modelo">
       <span id="provider-label" class="font-medium">OpenRouter</span>
       <span id="provider-badge" class="free-cost text-[10px] px-1.5 py-0.5 rounded-md font-semibold tracking-wide bg-green-500/10 text-green-400">Gratuito</span>
       <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button id="thinking-btn" class="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-medium border transition-all duration-200" aria-label="Thinking mode" title="Modo pensamiento: el modelo razona antes de responder">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v1M7 12v1M1 7h1M12 7h1M2.5 2.5l.7.7M10.8 10.8l.7.7M2.5 11.5l.7-.7M10.8 3.2l.7-.7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="7" cy="7" r="2.5" stroke="currentColor" stroke-width="1.2"/></svg>
+      <span id="thinking-label">Thinking</span>
     </button>
   </div>
 

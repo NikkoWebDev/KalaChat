@@ -41,13 +41,13 @@ const PROVIDER_CONFIGS = {
     type: 'gemini', label: 'Gemini Flash', mode: 'free', badge: null, group: 'gemini',
   },
   v4: {
-    baseUrl: import.meta.env.VITE_PRO_BASE_URL || '',
-    model: import.meta.env.VITE_PRO_MODEL_V4 || '',
+    baseUrl: import.meta.env.VITE_PRO_BASE_URL || 'https://api.deepseek.com',
+    model: import.meta.env.VITE_PRO_MODEL_V4 || 'deepseek-chat',
     type: 'openai', label: 'KALA PRO Flash', mode: 'pro', badge: 'Flash', group: 'pro',
   },
   'v4-pro': {
-    baseUrl: import.meta.env.VITE_PRO_BASE_URL || '',
-    model: import.meta.env.VITE_PRO_MODEL_V4_PRO || '',
+    baseUrl: import.meta.env.VITE_PRO_BASE_URL || 'https://api.deepseek.com',
+    model: import.meta.env.VITE_PRO_MODEL_V4_PRO || 'deepseek-reasoner',
     type: 'openai', label: 'KALA PRO²', mode: 'pro', badge: 'PRO²', group: 'pro',
   },
 }
@@ -158,16 +158,15 @@ function getSystemPrompt(providerId) {
   return SYSTEM_PROMPTS[providerId] || SYSTEM_PROMPTS['openrouter-free']
 }
 
-export async function* streamChat(messages, { provider, signal } = {}) {
+export async function* streamChat(messages, { provider, signal, thinking } = {}) {
   const config = getProviderConfig(provider)
   if (!config) throw new Error(`Provider "${provider}" no configurado`)
 
   const systemPrompt = getSystemPrompt(provider)
-
   const apiMessages = toApiMessages(messages, config.type)
 
   if (!config.apiKey) {
-    yield* streamViaProxy(apiMessages, provider, systemPrompt, signal)
+    yield* streamViaProxy(apiMessages, provider, systemPrompt, signal, thinking)
     return
   }
 
@@ -175,12 +174,13 @@ export async function* streamChat(messages, { provider, signal } = {}) {
     yield* streamGemini(apiMessages, config, systemPrompt, signal)
   } else {
     const messagesWithSystem = [{ role: 'system', content: systemPrompt }, ...apiMessages]
-    yield* streamOpenAI(messagesWithSystem, config, signal)
+    yield* streamOpenAI(messagesWithSystem, config, signal, thinking)
   }
 }
 
-async function* streamViaProxy(messages, provider, systemPrompt, signal) {
+async function* streamViaProxy(messages, provider, systemPrompt, signal, thinking) {
   const body = { provider, messages, systemPrompt }
+  if (thinking) body.thinking = true
   const customKey = getCustomApiKey(provider, PROVIDER_CONFIGS[provider]?.group)
   if (customKey) body.apiKey = customKey
 
@@ -195,20 +195,20 @@ async function* streamViaProxy(messages, provider, systemPrompt, signal) {
     throw new Error(`Error API (${response.status}): ${text || response.statusText}`)
   }
 
-  const cfg = PROVIDER_CONFIGS[provider]
-  const reader = response.body.getReader()
-
-  for await (const data of parseSSEStream(reader)) {
+  for await (const data of parseSSEStream(response.body.getReader())) {
     if (!data) continue
     try {
       const parsed = JSON.parse(data)
-      const text = extractContent(parsed, cfg?.type)
-      if (text) yield text
-    } catch { /* skip unparseable */ }
+      if (parsed.type === 'reasoning') {
+        if (parsed.text) yield { type: 'reasoning', text: parsed.text }
+      } else if (parsed.type === 'content') {
+        if (parsed.text) yield { type: 'content', text: parsed.text }
+      }
+    } catch { /* skip */ }
   }
 }
 
-async function* streamOpenAI(messages, config, signal) {
+async function* streamOpenAI(messages, config, signal, thinking) {
   const url = `${config.baseUrl}/chat/completions`
   const headers = {
     Authorization: `Bearer ${config.apiKey}`,
@@ -218,20 +218,34 @@ async function* streamOpenAI(messages, config, signal) {
     headers['X-Title'] = 'KalaChat'
   }
 
-  const response = await fetchStream(url, {
+  const body = {
     model: config.model,
     messages,
     stream: true,
-    temperature: API_DEFAULTS.temperature,
     max_tokens: API_DEFAULTS.maxTokens,
-  }, headers, signal)
+  }
+
+  if (thinking) {
+    body.reasoning_effort = 'high'
+    body.thinking = { type: 'enabled' }
+  } else {
+    body.temperature = API_DEFAULTS.temperature
+  }
+
+  const response = await fetchStream(url, body, headers, signal)
 
   for await (const data of parseSSEStream(response.body.getReader())) {
     if (!data) continue
     try {
       const parsed = JSON.parse(data)
-      const delta = parsed.choices?.[0]?.delta?.content || parsed.choices?.[0]?.text || ''
-      if (delta) yield delta
+      const choice = parsed.choices?.[0]
+      if (!choice) continue
+      const delta = choice.delta || {}
+      if (delta.reasoning_content) {
+        yield { type: 'reasoning', text: delta.reasoning_content }
+      }
+      const content = delta.content || choice.text || ''
+      if (content) yield { type: 'content', text: content }
     } catch { /* skip */ }
   }
 }
@@ -251,7 +265,7 @@ async function* streamGemini(messages, config, systemPrompt, signal) {
       const candidates = parsed.candidates
       if (!candidates?.length) continue
       const text = candidates[0].content?.parts?.[0]?.text
-      if (text) yield text
+      if (text) yield { type: 'content', text }
     } catch { /* skip */ }
   }
 }
@@ -259,7 +273,7 @@ async function* streamGemini(messages, config, systemPrompt, signal) {
 export async function chatCompletion(messages, { provider, signal } = {}) {
   let full = ''
   for await (const chunk of streamChat(messages, { provider, signal })) {
-    full += chunk
+    if (chunk.type === 'content') full += chunk.text
   }
   return full
 }

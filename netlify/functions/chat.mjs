@@ -47,7 +47,7 @@ export default async (req) => {
     return new Response('Invalid request body', { status: 400 })
   }
 
-  const { provider, messages, systemPrompt } = body
+  const { provider, messages, systemPrompt, thinking } = body
   if (!provider || !messages) {
     return new Response('Missing provider or messages', { status: 400 })
   }
@@ -65,13 +65,24 @@ export default async (req) => {
     })
   }
 
-  if (config.type === 'gemini') {
-    return proxyGemini(messages, config, apiKey, systemPrompt)
+  if (!config.baseUrl) {
+    return new Response(`Provider "${provider}" has no base URL. Set ${config.group === 'pro' ? 'PRO_BASE_URL' : config.group.toUpperCase() + '_BASE_URL'} in Netlify env vars.`, { status: 400 })
   }
-  return proxyOpenAI(messages, config, apiKey, systemPrompt)
+  if (!config.model) {
+    return new Response(`Provider "${provider}" has no model configured. Check environment variables.`, { status: 400 })
+  }
+
+  try {
+    if (config.type === 'gemini') {
+      return await proxyGemini(messages, config, apiKey, systemPrompt)
+    }
+    return await proxyOpenAI(messages, config, apiKey, systemPrompt, thinking)
+  } catch (err) {
+    return new Response(`Proxy error: ${err.message}`, { status: 502 })
+  }
 }
 
-async function proxyOpenAI(messages, config, apiKey, systemPrompt) {
+async function proxyOpenAI(messages, config, apiKey, systemPrompt, thinking) {
   const url = `${config.baseUrl}/chat/completions`
   const headers = {
     'Content-Type': 'application/json',
@@ -86,21 +97,80 @@ async function proxyOpenAI(messages, config, apiKey, systemPrompt) {
     ? [{ role: 'system', content: systemPrompt }, ...messages]
     : messages
 
+  const body = {
+    model: config.model,
+    messages: fullMessages,
+    stream: true,
+    max_tokens: 4096,
+  }
+
+  if (thinking) {
+    body.reasoning_effort = 'high'
+    body.thinking = { type: 'enabled' }
+  } else {
+    body.temperature = 0.7
+  }
+
   const response = await fetch(url, {
     method: 'POST',
     headers,
-    body: JSON.stringify({
-      model: config.model,
-      messages: fullMessages,
-      stream: true,
-      temperature: 0.7,
-      max_tokens: 4096,
-    }),
+    body: JSON.stringify(body),
   })
 
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
+  if (!response.ok) {
+    const text = await response.text().catch(() => '')
+    return new Response(text, { status: response.status })
+  }
+
+  const encoder = new TextEncoder()
+  const decoder = new TextDecoder()
+  const reader = response.body.getReader()
+  let buffer = ''
+
+  const readable = new ReadableStream({
+    async start(controller) {
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+
+          for (const line of lines) {
+            const trimmed = line.trim()
+            if (!trimmed || !trimmed.startsWith('data:')) continue
+            const data = trimmed.slice(5).trim()
+            if (data === '[DONE]') continue
+            if (!data) continue
+
+            try {
+              const parsed = JSON.parse(data)
+              const choice = parsed.choices?.[0]
+              if (!choice) continue
+              const delta = choice.delta || {}
+              if (delta.reasoning_content) {
+                const chunk = `data: ${JSON.stringify({ type: 'reasoning', text: delta.reasoning_content })}\n\n`
+                controller.enqueue(encoder.encode(chunk))
+              }
+              const content = delta.content || choice.text || ''
+              if (content) {
+                const chunk = `data: ${JSON.stringify({ type: 'content', text: content })}\n\n`
+                controller.enqueue(encoder.encode(chunk))
+              }
+            } catch { /* skip */ }
+          }
+        }
+      } finally {
+        reader.releaseLock()
+        controller.close()
+      }
+    },
+  })
+
+  return new Response(readable, {
+    status: 200,
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',

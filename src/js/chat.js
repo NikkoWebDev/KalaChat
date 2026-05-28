@@ -72,7 +72,24 @@ export async function initRenderer() {
   })
 }
 
-export function setupCopyButtons(container) {
+function setupReasoningToggle(container) {
+  container.addEventListener('click', (e) => {
+    const toggle = e.target.closest('.reasoning-toggle')
+    if (!toggle) return
+    const content = toggle.parentElement?.querySelector('.reasoning-content')
+    if (!content) return
+    const expanded = toggle.getAttribute('aria-expanded') === 'true'
+    toggle.setAttribute('aria-expanded', !expanded)
+    content.hidden = expanded
+  })
+}
+
+export function setupMessageInteractions(container) {
+  setupCopyButtons(container)
+  setupReasoningToggle(container)
+}
+
+function setupCopyButtons(container) {
   container.addEventListener('click', async (e) => {
     const btn = e.target.closest('.code-copy-btn')
     if (!btn) return
@@ -143,9 +160,14 @@ export async function renderMessage(message) {
     ? '<div class="message-avatar">K</div>'
     : '<div class="message-avatar">T</div>'
 
+  const reasoningHtml = message.role === 'assistant' && message.reasoning
+    ? renderReasoningBlock(message.reasoning)
+    : ''
+
   div.innerHTML = `
     ${avatar}
     <div class="message-content">
+      ${reasoningHtml}
       <div class="message-bubble">${imagesHtml}${content}</div>
       <div class="message-time">${time}</div>
     </div>`
@@ -160,6 +182,14 @@ export function renderStreamingMessage(messageId) {
   div.innerHTML = `
     <div class="message-avatar">K</div>
     <div class="message-content">
+      <div class="message-reasoning" id="reasoning-${messageId}" hidden>
+        <button class="reasoning-toggle" aria-expanded="false" aria-label="Toggle reasoning">
+          <svg class="reasoning-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4 3l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Thinking</span>
+          <span class="reasoning-dots"></span>
+        </button>
+        <div class="reasoning-content" id="reasoning-content-${messageId}"></div>
+      </div>
       <div class="message-bubble" id="streaming-${messageId}">
         <span class="streaming-cursor"></span>
       </div>
@@ -178,6 +208,48 @@ export async function finalizeStreamingContent(messageId, text) {
   const el = document.getElementById(`streaming-${messageId}`)
   if (!el) return
   el.innerHTML = await parseMarkdown(text)
+}
+
+export function showStreamingReasoning(messageId) {
+  const el = document.getElementById(`reasoning-${messageId}`)
+  if (el) el.hidden = false
+  const dots = el?.querySelector('.reasoning-dots')
+  if (dots) {
+    let count = 0
+    setInterval(() => {
+      count = (count + 1) % 4
+      dots.textContent = '.'.repeat(count)
+    }, 400)
+  }
+}
+
+export function updateStreamingReasoning(messageId, text) {
+  const el = document.getElementById(`reasoning-content-${messageId}`)
+  if (!el) return
+  el.textContent = text
+}
+
+export function finalizeStreamingReasoning(messageId, text) {
+  const el = document.getElementById(`reasoning-content-${messageId}`)
+  if (!el) return
+  el.textContent = text || ''
+  const toggle = el.closest('.message-reasoning')?.querySelector('.reasoning-toggle')
+  if (toggle) {
+    toggle.setAttribute('aria-expanded', 'false')
+    toggle.querySelector('.reasoning-dots')?.remove()
+  }
+}
+
+export function renderReasoningBlock(reasoning) {
+  if (!reasoning) return ''
+  return `
+    <div class="message-reasoning">
+      <button class="reasoning-toggle" aria-expanded="false" aria-label="Toggle reasoning">
+        <svg class="reasoning-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4 3l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Thinking</span>
+      </button>
+      <div class="reasoning-content">${escapeHtml(reasoning)}</div>
+    </div>`
 }
 
 export function renderTypingIndicator(providerLabel) {

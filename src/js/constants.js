@@ -10,6 +10,7 @@ export const DEFAULTS = {
   currentId: null,
   provider: null,
   costWarningDismissed: false,
+  thinking: true,
 }
 
 export const API_DEFAULTS = {

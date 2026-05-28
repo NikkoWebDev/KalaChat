@@ -186,6 +186,20 @@
   .file-chip-remove{@apply w-4 h-4 rounded flex items-center justify-center text-gold/60 hover:text-gold hover:bg-gold/20 transition-colors duration-150 leading-none text-sm font-bold shrink-0}
   .file-chip-remove:hover{@apply bg-gold/20}
 
+  /* --- Reasoning block --- */
+  .message-reasoning{@apply mb-2 rounded-xl overflow-hidden border}
+  [data-theme="dark"] .message-reasoning{@apply border-surface-800 bg-surface-500/80}
+  [data-theme="light"] .message-reasoning{@apply border-[#EEEAE2] bg-[#FAFAFA]}
+  .reasoning-toggle{@apply flex items-center gap-1.5 w-full px-3 py-2 text-[11px] font-medium text-surface-300 transition-colors duration-200 cursor-pointer select-none}
+  .reasoning-toggle:hover{@apply text-gold}
+  .reasoning-chevron{@apply shrink-0 transition-transform duration-200}
+  .reasoning-toggle[aria-expanded="false"] .reasoning-chevron{transform:rotate(0deg)}
+  .reasoning-toggle[aria-expanded="true"] .reasoning-chevron{transform:rotate(90deg)}
+  .reasoning-dots{@apply inline-block min-w-[12px] text-left}
+  .reasoning-content{@apply px-3 pb-3 pt-1 text-[13px] leading-relaxed whitespace-pre-wrap font-mono}
+  [data-theme="dark"] .reasoning-content{@apply text-surface-200}
+  [data-theme="light"] .reasoning-content{@apply text-[#7A7670]}
+
   /* --- Input wrapper refinements --- */
   .input-wrapper{position:relative}
   .input-wrapper::after{content:'';position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .3s ease;z-index:-1}

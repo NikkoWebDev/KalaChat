@@ -2,7 +2,8 @@ import { streamChat, getAvailableProviders, getDefaultProvider, isProviderConfig
 import {
   renderMessage, renderStreamingMessage, updateStreamingContent,
   finalizeStreamingContent, renderTypingIndicator, removeTypingIndicator,
-  formatConversationDate, setupCopyButtons, initRenderer
+  formatConversationDate, setupMessageInteractions, initRenderer,
+  showStreamingReasoning, updateStreamingReasoning, finalizeStreamingReasoning,
 } from './chat.js'
 import { escapeHtml, fileToBase64 } from './utils.js'
 import { STORAGE_KEYS, DEFAULTS, UI } from './constants.js'
@@ -28,6 +29,7 @@ function cacheElements() {
     'settings-modal', 'settings-close', 'settings-save',
     'settings-openrouter', 'settings-gemini', 'settings-pro',
     'file-input', 'attach-btn', 'file-list', 'settings-provider-info',
+    'thinking-btn',
   ]
   ids.forEach(id => { el[id] = $(`#${id}`) })
   el.modeBtns = $$('.mode-btn')
@@ -56,6 +58,7 @@ function saveState() {
     const toStore = {
       mode: state.mode,
       theme: state.theme,
+      thinking: state.thinking,
       conversations: state.conversations.map(c => ({
         ...c,
         messages: c.messages.slice(-UI.maxStoredMessages)
@@ -412,6 +415,7 @@ async function sendMessage() {
   el['messages-list'].appendChild(aiMsgEl)
   scrollToBottom()
 
+  let fullReasoning = ''
   let fullResponse = ''
   abortController = new AbortController()
 
@@ -425,18 +429,27 @@ async function sendMessage() {
     for await (const chunk of streamChat(messagesForApi, {
       provider: state.provider,
       signal: abortController.signal,
+      thinking: state.thinking,
     })) {
-      fullResponse += chunk
-      updateStreamingContent(aiMsgId, fullResponse)
+      if (chunk.type === 'reasoning') {
+        if (!fullReasoning && chunk.text) showStreamingReasoning(aiMsgId)
+        fullReasoning += chunk.text
+        updateStreamingReasoning(aiMsgId, fullReasoning)
+      } else {
+        fullResponse += chunk.text
+        updateStreamingContent(aiMsgId, fullResponse)
+      }
       scrollToBottom()
     }
 
+    if (fullReasoning) finalizeStreamingReasoning(aiMsgId, fullReasoning)
     await finalizeStreamingContent(aiMsgId, fullResponse)
 
     const aiMsg = {
       id: aiMsgId,
       role: 'assistant',
       content: fullResponse,
+      ...(fullReasoning ? { reasoning: fullReasoning } : {}),
       timestamp: Date.now(),
       provider: state.provider,
     }
@@ -447,11 +460,13 @@ async function sendMessage() {
   } catch (err) {
     if (err.name === 'AbortError') {
       if (fullResponse) {
+        if (fullReasoning) finalizeStreamingReasoning(aiMsgId, fullReasoning)
         await finalizeStreamingContent(aiMsgId, fullResponse)
         conv.messages.push({
           id: aiMsgId,
           role: 'assistant',
           content: fullResponse + '\n\n*(generación detenida)*',
+          ...(fullReasoning ? { reasoning: fullReasoning } : {}),
           timestamp: Date.now(),
           provider: state.provider,
         })
@@ -611,7 +626,7 @@ async function start() {
   cacheElements()
   initProviders()
 
-  setupCopyButtons(el['messages-list'])
+  setupMessageInteractions(el['messages-list'])
 
   // --- Provider dropdown (fixed positioning to avoid overflow: hidden) ---
   if (el['provider-selector']) {
@@ -711,6 +726,27 @@ async function start() {
     })
   })
   updateSettingsThemeBtns()
+
+  // --- Thinking toggle ---
+  function updateThinkingBtn() {
+    if (!el['thinking-btn']) return
+    const isActive = state.thinking
+    el['thinking-btn'].setAttribute('data-active', isActive ? '' : null)
+    el['thinking-btn'].className = `flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-medium border transition-all duration-200 ${
+      isActive
+        ? 'bg-gold/10 border-gold text-gold'
+        : 'bg-surface-400 border-surface-700 text-surface-300 hover:bg-gold/10 hover:text-gold hover:border-gold/30'
+    }`
+    if (el['thinking-label']) el['thinking-label'].textContent = isActive ? 'Thinking' : 'No thinking'
+  }
+  if (el['thinking-btn']) {
+    el['thinking-btn'].addEventListener('click', () => {
+      state.thinking = !state.thinking
+      updateThinkingBtn()
+      saveState()
+    })
+  }
+  updateThinkingBtn()
 
   // --- Modal backdrop clicks ---
   $$('.modal-overlay').forEach(modal => {
