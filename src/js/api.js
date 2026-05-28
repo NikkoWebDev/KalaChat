@@ -75,8 +75,11 @@ export function setSettingsOverrides(overrides) {
 }
 
 export function getAvailableProviders(mode) {
+  return getAllProviders().filter(p => p.mode === mode)
+}
+
+export function getAllProviders() {
   return Object.entries(PROVIDER_CONFIGS)
-    .filter(([, c]) => c.mode === mode)
     .map(([id]) => ({ id, ...getProviderConfig(id) }))
 }
 

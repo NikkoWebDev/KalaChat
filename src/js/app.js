@@ -1,4 +1,4 @@
-import { streamChat, getAvailableProviders, getDefaultProvider, isProviderConfigured, setSettingsOverrides } from './api.js'
+import { streamChat, getProviderConfig, getAllProviders, isProviderConfigured, setSettingsOverrides } from './api.js'
 import {
   renderMessage, renderStreamingMessage, updateStreamingContent,
   finalizeStreamingContent, renderTypingIndicator, removeTypingIndicator,
@@ -34,7 +34,6 @@ function cacheElements() {
     'scroll-bottom-btn', 'theme-color-meta',
   ]
   ids.forEach(id => { el[id] = $(`#${id}`) })
-  el.modeBtns = $$('.mode-btn')
   el.suggestionChips = $$('.suggestion-chip')
   el.settingsInputs = {
     openrouter: el['settings-openrouter'],
@@ -55,10 +54,14 @@ function loadState() {
   state = { ...DEFAULTS }
 }
 
+function providerMode(id) {
+  return getProviderConfig(id)?.mode || 'free'
+}
+
 function saveState() {
   try {
     const toStore = {
-      mode: state.mode,
+      mode: providerMode(state.provider),
       theme: state.theme,
       thinking: state.thinking,
       conversations: state.conversations.map(c => ({
@@ -101,7 +104,7 @@ function createNewConversation() {
     title: 'Nueva conversación',
     messages: [],
     provider: state.provider,
-    mode: state.mode,
+    mode: providerMode(state.provider),
     createdAt: Date.now(),
     updatedAt: Date.now(),
   }
@@ -122,100 +125,58 @@ function switchToConversation(id) {
 }
 
 function updateProviderUI() {
-  const providers = getAvailableProviders(state.mode)
-  const current = providers.find(p => p.id === state.provider)
+  const cfg = getProviderConfig(state.provider)
 
-  if (current && el['provider-label'] && el['provider-badge']) {
-    el['provider-label'].textContent = current.label
-    el['provider-badge'].textContent = state.mode === 'free' ? 'Gratuito' : 'PRO'
-    el['provider-badge'].className = `provider-cost ${state.mode === 'free' ? 'free-cost' : 'pro-cost'}`
+  if (cfg && el['provider-label'] && el['provider-badge']) {
+    el['provider-label'].textContent = cfg.label
+    const isFree = cfg.mode === 'free'
+    el['provider-badge'].textContent = isFree ? 'Gratuito' : 'PRO'
+    el['provider-badge'].className = `provider-cost ${isFree ? 'free-cost' : 'pro-cost'}`
   }
 
   el['dropdown-free-group']?.querySelectorAll('.dropdown-item').forEach(item => {
     item.setAttribute('aria-selected', item.dataset.provider === state.provider)
   })
-  el['dropdown-pro-group']?.querySelectorAll('.dropdown-item').forEach(item => {
-    item.setAttribute('aria-selected', item.dataset.provider === state.provider)
-  })
   updateSettingsProviderInfo()
 }
 
-function doSetMode(mode) {
-  state.mode = mode
-  el.modeBtns.forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.mode === mode)
-    btn.setAttribute('aria-checked', btn.dataset.mode === mode)
-  })
-
-  const providers = getAvailableProviders(mode)
-  const currentInMode = providers.find(p => p.id === state.provider)
-  state.provider = currentInMode ? state.provider : (providers[0]?.id || null)
-
-  buildDropdown()
-  updateProviderUI()
-  saveState()
-}
-
-function setMode(mode) {
-  if (mode === state.mode) return
-  if (mode === 'pro' && !state.costWarningDismissed) {
-    showCostModal(() => doSetMode(mode))
-    return
-  }
-  doSetMode(mode)
-}
-
 function buildDropdown() {
-  const freeProviders = getAvailableProviders('free')
-  const proProviders = getAvailableProviders('pro')
+  const providers = getAllProviders()
 
   if (el['dropdown-free-group']) {
-    el['dropdown-free-group'].innerHTML =
-      '<div class="dropdown-group-label">Gratuitos</div>' +
-      freeProviders.map(p => `
+    el['dropdown-free-group'].innerHTML = providers.map(p => {
+      const badge = p.mode === 'free' ? 'Gratis' : 'PRO'
+      const badgeClass = p.mode === 'free' ? 'free-badge' : 'pro-badge'
+      return `
         <button class="dropdown-item" data-provider="${escapeHtml(p.id)}" role="option" aria-selected="${p.id === state.provider}">
           <span class="dropdown-item-name">${escapeHtml(p.label)}${p.badge ? ` <span style="font-size:10px;color:var(--color-gold,#C8A87C);font-weight:600">· ${escapeHtml(p.badge)}</span>` : ''}</span>
-          <span class="dropdown-item-badge free-badge">Gratis</span>
-        </button>
-      `).join('')
+          <span class="dropdown-item-badge ${badgeClass}">${badge}</span>
+        </button>`
+    }).join('')
   }
 
-  if (el['dropdown-pro-group']) {
-    el['dropdown-pro-group'].innerHTML =
-      '<div class="dropdown-group-label">PRO · Facturable</div>' +
-      proProviders.map(p => `
-        <button class="dropdown-item" data-provider="${escapeHtml(p.id)}" role="option" aria-selected="${p.id === state.provider}">
-          <span class="dropdown-item-name">${escapeHtml(p.label)}</span>
-          <span class="dropdown-item-badge pro-badge">PRO</span>
-        </button>
-      `).join('')
-  }
-
-  if (el['dropdown-divider']) {
-    el['dropdown-divider'].style.display = (freeProviders.length > 0 && proProviders.length > 0) ? 'block' : 'none'
-  }
+  if (el['dropdown-pro-group']) el['dropdown-pro-group'].innerHTML = ''
+  if (el['dropdown-divider']) el['dropdown-divider'].style.display = 'none'
 
   el['dropdown-free-group']?.querySelectorAll('.dropdown-item').forEach(bindDropdownItem)
-  el['dropdown-pro-group']?.querySelectorAll('.dropdown-item').forEach(bindDropdownItem)
 }
 
 function bindDropdownItem(item) {
   item.addEventListener('click', () => {
     const providerId = item.dataset.provider
-    if (state.mode === 'free') {
-      state.provider = providerId
-    } else {
-      if (!state.costWarningDismissed) {
-        showCostModal(() => {
-          state.provider = providerId
-          updateProviderUI()
-          saveState()
-        })
-        el['provider-dropdown'].classList.add('hidden')
-        return
-      }
-      state.provider = providerId
+    const cfg = getProviderConfig(providerId)
+
+    if (cfg?.mode === 'pro' && !state.costWarningDismissed) {
+      showCostModal(() => {
+        state.provider = providerId
+        updateProviderUI()
+        saveState()
+      })
+      el['provider-dropdown'].classList.add('hidden')
+      return
     }
+
+    state.provider = providerId
     updateProviderUI()
     saveState()
     el['provider-dropdown'].classList.add('hidden')
@@ -249,7 +210,6 @@ function showCostModal(onAccept) {
     hideModal(el['cost-modal'])
     el['cost-modal-accept'].removeEventListener('click', handleAccept)
     el['cost-modal-cancel'].removeEventListener('click', handleCancel)
-    if (state.mode === 'pro') doSetMode('free')
   }
 
   el['cost-modal-accept'].addEventListener('click', handleAccept)
@@ -290,13 +250,14 @@ function renderConversationList() {
     .map(c => {
       const isActive = c.id === state.currentId
       const date = formatConversationDate(c.updatedAt)
+      const modeDisplay = (getProviderConfig(c.provider)?.mode || c.mode) === 'free' ? 'Free' : 'PRO'
       return `
         <div class="conversation-item ${isActive ? 'active' : ''}" data-conv-id="${escapeHtml(c.id)}">
           <div class="conversation-item-title">${escapeHtml(c.title)}</div>
           <div class="conversation-item-meta">
             <span>${escapeHtml(date)}</span>
             <span>·</span>
-            <span>${c.mode === 'free' ? 'Free' : 'PRO'}</span>
+            <span>${modeDisplay}</span>
           </div>
           <button class="delete-btn" data-conv-id="${escapeHtml(c.id)}" aria-label="Eliminar conversación">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4h10M5 4V2.5a.5.5 0 01.5-.5h3a.5.5 0 01.5.5V4m1 0v7.5a1 1 0 01-1 1H5a1 1 0 01-1-1V4m2 3v3m3-3v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
@@ -364,7 +325,7 @@ async function sendMessage() {
   if (!conv) conv = createNewConversation()
 
   if (!isProviderConfigured(state.provider)) {
-    const name = getAvailableProviders(state.mode).find(p => p.id === state.provider)?.label || state.provider
+    const name = getProviderConfig(state.provider)?.label || state.provider
     showToast(`Configura API key para ${name} en Ajustes`)
     return
   }
@@ -414,8 +375,7 @@ async function sendMessage() {
   el['message-input'].style.height = 'auto'
   scrollToBottom()
 
-  const currentProvider = getAvailableProviders(state.mode)
-    .find(p => p.id === state.provider)?.label || ''
+  const currentProvider = getProviderConfig(state.provider)?.label || ''
   el['messages-list'].appendChild(renderTypingIndicator(currentProvider))
   scrollToBottom()
 
@@ -598,19 +558,20 @@ function loadSettingsIntoUI() {
 }
 
 function updateSettingsProviderInfo() {
-  const prov = getAvailableProviders(state.mode).find(p => p.id === state.provider)
+  const prov = getProviderConfig(state.provider)
   const info = el['settings-provider-info']
   if (!info) return
   if (prov) {
+    const isFree = prov.mode === 'free'
     info.innerHTML = `
       <div class="flex items-center gap-2 mb-1">
         <span class="text-sm font-semibold">${escapeHtml(prov.label)}</span>
-        <span class="text-[10px] px-1.5 py-0.5 rounded-md font-semibold ${state.mode === 'free' ? 'bg-green-500/10 text-green-400' : 'bg-gold/10 text-gold'}">${state.mode === 'free' ? 'Gratuito' : 'PRO'}</span>
+        <span class="text-[10px] px-1.5 py-0.5 rounded-md font-semibold ${isFree ? 'bg-green-500/10 text-green-400' : 'bg-gold/10 text-gold'}">${isFree ? 'Gratuito' : 'PRO'}</span>
       </div>
       <div class="flex items-center gap-3 text-xs text-surface-300">
         <span>Tema: ${state.theme === 'dark' ? 'oscuro' : 'claro'}</span>
         <span>·</span>
-        <span>Modelos: ${state.mode === 'free' ? getAvailableProviders('free').length : getAvailableProviders('pro').length} disp.</span>
+        <span>Modelos: ${getAllProviders().length} disp.</span>
       </div>`
   } else {
     info.innerHTML = '<span class="text-xs text-surface-300">Ningún proveedor seleccionado</span>'
@@ -618,9 +579,9 @@ function updateSettingsProviderInfo() {
 }
 
 function initProviders() {
-  const defaultProvider = getDefaultProvider(state.mode)
-  if (!state.provider || !getAvailableProviders(state.mode).find(p => p.id === state.provider)) {
-    state.provider = defaultProvider
+  const all = getAllProviders()
+  if (!state.provider || !all.find(p => p.id === state.provider)) {
+    state.provider = all.find(p => p.mode === 'free')?.id || all[0]?.id || null
   }
 }
 
@@ -713,11 +674,6 @@ async function start() {
       updateSettingsThemeBtns()
     })
   }
-
-  // --- Mode buttons ---
-  el.modeBtns.forEach(btn => {
-    btn.addEventListener('click', () => setMode(btn.dataset.mode))
-  })
 
   // --- Sidebar ---
   if (el['menu-btn']) el['menu-btn'].addEventListener('click', toggleSidebar)
@@ -893,7 +849,6 @@ async function start() {
 
   // --- Init UI ---
   applyTheme(state.theme)
-  doSetMode(state.mode)
   buildDropdown()
   updateProviderUI()
   await initRenderer()
