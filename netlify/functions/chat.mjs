@@ -47,7 +47,7 @@ export default async (req) => {
     return new Response('Invalid request body', { status: 400 })
   }
 
-  const { provider, messages } = body
+  const { provider, messages, systemPrompt } = body
   if (!provider || !messages) {
     return new Response('Missing provider or messages', { status: 400 })
   }
@@ -66,12 +66,12 @@ export default async (req) => {
   }
 
   if (config.type === 'gemini') {
-    return proxyGemini(messages, config, apiKey)
+    return proxyGemini(messages, config, apiKey, systemPrompt)
   }
-  return proxyOpenAI(messages, config, apiKey)
+  return proxyOpenAI(messages, config, apiKey, systemPrompt)
 }
 
-async function proxyOpenAI(messages, config, apiKey) {
+async function proxyOpenAI(messages, config, apiKey, systemPrompt) {
   const url = `${config.baseUrl}/chat/completions`
   const headers = {
     'Content-Type': 'application/json',
@@ -82,12 +82,16 @@ async function proxyOpenAI(messages, config, apiKey) {
     headers['X-Title'] = 'KalaChat'
   }
 
+  const fullMessages = systemPrompt
+    ? [{ role: 'system', content: systemPrompt }, ...messages]
+    : messages
+
   const response = await fetch(url, {
     method: 'POST',
     headers,
     body: JSON.stringify({
       model: config.model,
-      messages,
+      messages: fullMessages,
       stream: true,
       temperature: 0.7,
       max_tokens: 4096,
@@ -105,16 +109,21 @@ async function proxyOpenAI(messages, config, apiKey) {
   })
 }
 
-async function proxyGemini(messages, config, apiKey) {
+async function proxyGemini(messages, config, apiKey, systemPrompt) {
   const url = `${config.baseUrl}/models/${config.model}:streamGenerateContent?key=${apiKey}`
+
+  const body = {
+    contents: messages,
+    generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
+  }
+  if (systemPrompt) {
+    body.systemInstruction = { parts: [{ text: systemPrompt }] }
+  }
 
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: messages,
-      generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
-    }),
+    body: JSON.stringify(body),
   })
 
   return new Response(response.body, {

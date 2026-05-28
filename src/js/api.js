@@ -1,5 +1,5 @@
 import { parseSSEStream } from './utils.js'
-import { API_DEFAULTS } from './constants.js'
+import { API_DEFAULTS, SYSTEM_PROMPTS } from './constants.js'
 
 function env(key, fallback) {
   return import.meta.env[key] || fallback
@@ -17,27 +17,27 @@ const PROVIDER_CONFIGS = {
   'openrouter-free': {
     baseUrl: OPENROUTER_BASE,
     model: env('VITE_OPENROUTER_MODEL_FREE', 'openrouter/free'),
-    type: 'openai', label: 'OpenRouter', mode: 'free', badge: 'Mejor', group: 'openrouter',
+    type: 'openai', label: 'KALA OpenRouter', mode: 'free', badge: 'Mejor', group: 'openrouter',
   },
   'openrouter-nemotron': {
     baseUrl: OPENROUTER_BASE,
     model: env('VITE_OPENROUTER_MODEL_NEMOTRON', 'nvidia/nemotron-3-super-120b-a12b:free'),
-    type: 'openai', label: 'Nemotron 3 Super', mode: 'free', badge: null, group: 'openrouter',
+    type: 'openai', label: 'Nemotron 3', mode: 'free', badge: null, group: 'openrouter',
   },
   'openrouter-gptoss': {
     baseUrl: OPENROUTER_BASE,
     model: env('VITE_OPENROUTER_MODEL_GPTOSS', 'openai/gpt-oss-120b:free'),
-    type: 'openai', label: 'GPT-OSS 120B', mode: 'free', badge: null, group: 'openrouter',
+    type: 'openai', label: 'GPT-OSS', mode: 'free', badge: null, group: 'openrouter',
   },
   'openrouter-minimax': {
     baseUrl: OPENROUTER_BASE,
     model: env('VITE_OPENROUTER_MODEL_MINIMAX', 'minimax/minimax-m2.5:free'),
-    type: 'openai', label: 'Minimax M2.5', mode: 'free', badge: null, group: 'openrouter',
+    type: 'openai', label: 'Minimax', mode: 'free', badge: null, group: 'openrouter',
   },
   'openrouter-dolphin': {
     baseUrl: OPENROUTER_BASE,
     model: env('VITE_OPENROUTER_MODEL_DOLPHIN', 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free'),
-    type: 'openai', label: 'Dolphin Mistral', mode: 'free', badge: 'Sin censura', group: 'openrouter',
+    type: 'openai', label: 'Dolphin', mode: 'free', badge: 'Sin censura', group: 'openrouter',
   },
   gemini: {
     baseUrl: env('VITE_GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
@@ -47,12 +47,12 @@ const PROVIDER_CONFIGS = {
   v4: {
     baseUrl: env('VITE_PRO_BASE_URL', ''),
     model: env('VITE_PRO_MODEL_V4', ''),
-    type: 'openai', label: 'Model v4', mode: 'pro', badge: null, group: 'pro',
+    type: 'openai', label: 'KALA PRO Flash', mode: 'pro', badge: 'Flash', group: 'pro',
   },
   'v4-pro': {
     baseUrl: env('VITE_PRO_BASE_URL', ''),
     model: env('VITE_PRO_MODEL_V4_PRO', ''),
-    type: 'openai', label: 'Model v4 Pro', mode: 'pro', badge: null, group: 'pro',
+    type: 'openai', label: 'KALA PRO²', mode: 'pro', badge: 'PRO²', group: 'pro',
   },
 }
 
@@ -130,26 +130,33 @@ async function fetchStream(url, body, headers, signal) {
   return response
 }
 
+function getSystemPrompt(providerId) {
+  return SYSTEM_PROMPTS[providerId] || SYSTEM_PROMPTS['openrouter-free']
+}
+
 export async function* streamChat(messages, { provider, signal } = {}) {
   const config = getProviderConfig(provider)
   if (!config) throw new Error(`Provider "${provider}" no configurado`)
 
-  const apiMessages = toApiMessages(messages, config.type)
+  const systemPrompt = getSystemPrompt(provider)
 
   if (!config.apiKey) {
-    yield* streamViaProxy(apiMessages, provider, signal)
+    yield* streamViaProxy(messages, provider, systemPrompt, signal)
     return
   }
 
+  const apiMessages = toApiMessages(messages, config.type)
+
   if (config.type === 'gemini') {
-    yield* streamGemini(apiMessages, config, signal)
+    yield* streamGemini(apiMessages, config, systemPrompt, signal)
   } else {
-    yield* streamOpenAI(apiMessages, config, signal)
+    const messagesWithSystem = [{ role: 'system', content: systemPrompt }, ...apiMessages]
+    yield* streamOpenAI(messagesWithSystem, config, signal)
   }
 }
 
-async function* streamViaProxy(messages, provider, signal) {
-  const body = { provider, messages }
+async function* streamViaProxy(messages, provider, systemPrompt, signal) {
+  const body = { provider, messages, systemPrompt }
   const customKey = getCustomApiKey(provider, PROVIDER_CONFIGS[provider]?.group)
   if (customKey) body.apiKey = customKey
 
@@ -205,10 +212,11 @@ async function* streamOpenAI(messages, config, signal) {
   }
 }
 
-async function* streamGemini(messages, config, signal) {
+async function* streamGemini(messages, config, systemPrompt, signal) {
   const url = `${config.baseUrl}/models/${config.model}:streamGenerateContent?key=${config.apiKey}`
   const response = await fetchStream(url, {
     contents: messages,
+    systemInstruction: { parts: [{ text: systemPrompt }] },
     generationConfig: { temperature: API_DEFAULTS.temperature, maxOutputTokens: API_DEFAULTS.maxTokens },
   }, {}, signal)
 
