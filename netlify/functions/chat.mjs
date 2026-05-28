@@ -1,11 +1,15 @@
 import { PROVIDER_CONFIGS } from './shared/providers.mjs'
 
-const ALLOWED_ORIGINS = [
-  'https://kalachat.app',
-  'https://kalachat.netlify.app',
-  'http://localhost:5173',
-  'http://localhost:4321',
-]
+function isOriginAllowed(request) {
+  const origin = request.headers.get('origin') || ''
+  if (!origin) return false
+  try {
+    const url = new URL(origin)
+    const host = url.hostname
+    if (host === 'localhost' || host.endsWith('.netlify.app') || host.endsWith('.app')) return true
+  } catch { return false }
+  return false
+}
 
 const RATE_LIMIT_WINDOW = 60_000
 const RATE_LIMIT_MAX = 30
@@ -20,12 +24,6 @@ function isRateLimited(ip) {
   }
   entry.count++
   return entry.count > RATE_LIMIT_MAX
-}
-
-function isOriginAllowed(request) {
-  const origin = request.headers.get('origin') || request.headers.get('referer') || ''
-  if (!origin) return false
-  return ALLOWED_ORIGINS.some(allowed => origin.startsWith(allowed))
 }
 
 export default async (req) => {
