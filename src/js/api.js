@@ -1,57 +1,57 @@
 import { parseSSEStream } from './utils.js'
 import { API_DEFAULTS } from './constants.js'
 
-function env(key) {
-  return import.meta.env[key] || ''
+function env(key, fallback) {
+  return import.meta.env[key] || fallback
 }
 
-const OPENROUTER_BASE = env('VITE_OPENROUTER_BASE_URL')
+const OPENROUTER_BASE = env('VITE_OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1')
 
 const ENV_KEYS = {
-  openrouter: env('VITE_OPENROUTER_API_KEY'),
-  gemini: env('VITE_GEMINI_API_KEY'),
-  pro: env('VITE_PRO_API_KEY'),
+  openrouter: env('VITE_OPENROUTER_API_KEY', ''),
+  gemini: env('VITE_GEMINI_API_KEY', ''),
+  pro: env('VITE_PRO_API_KEY', ''),
 }
 
 const PROVIDER_CONFIGS = {
   'openrouter-free': {
     baseUrl: OPENROUTER_BASE,
-    model: env('VITE_OPENROUTER_MODEL_FREE'),
+    model: env('VITE_OPENROUTER_MODEL_FREE', 'openrouter/free'),
     type: 'openai', label: 'OpenRouter', mode: 'free', badge: 'Mejor', group: 'openrouter',
   },
   'openrouter-nemotron': {
     baseUrl: OPENROUTER_BASE,
-    model: env('VITE_OPENROUTER_MODEL_NEMOTRON'),
+    model: env('VITE_OPENROUTER_MODEL_NEMOTRON', 'nvidia/nemotron-3-super-120b-a12b:free'),
     type: 'openai', label: 'Nemotron 3 Super', mode: 'free', badge: null, group: 'openrouter',
   },
   'openrouter-gptoss': {
     baseUrl: OPENROUTER_BASE,
-    model: env('VITE_OPENROUTER_MODEL_GPTOSS'),
+    model: env('VITE_OPENROUTER_MODEL_GPTOSS', 'openai/gpt-oss-120b:free'),
     type: 'openai', label: 'GPT-OSS 120B', mode: 'free', badge: null, group: 'openrouter',
   },
   'openrouter-minimax': {
     baseUrl: OPENROUTER_BASE,
-    model: env('VITE_OPENROUTER_MODEL_MINIMAX'),
+    model: env('VITE_OPENROUTER_MODEL_MINIMAX', 'minimax/minimax-m2.5:free'),
     type: 'openai', label: 'Minimax M2.5', mode: 'free', badge: null, group: 'openrouter',
   },
   'openrouter-dolphin': {
     baseUrl: OPENROUTER_BASE,
-    model: env('VITE_OPENROUTER_MODEL_DOLPHIN'),
+    model: env('VITE_OPENROUTER_MODEL_DOLPHIN', 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free'),
     type: 'openai', label: 'Dolphin Mistral', mode: 'free', badge: 'Sin censura', group: 'openrouter',
   },
   gemini: {
-    baseUrl: env('VITE_GEMINI_BASE_URL'),
-    model: env('VITE_GEMINI_MODEL'),
+    baseUrl: env('VITE_GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
+    model: env('VITE_GEMINI_MODEL', 'gemini-2.0-flash'),
     type: 'gemini', label: 'Gemini Flash', mode: 'free', badge: null, group: 'gemini',
   },
   v4: {
-    baseUrl: env('VITE_PRO_BASE_URL'),
-    model: env('VITE_PRO_MODEL_V4'),
+    baseUrl: env('VITE_PRO_BASE_URL', ''),
+    model: env('VITE_PRO_MODEL_V4', ''),
     type: 'openai', label: 'Model v4', mode: 'pro', badge: null, group: 'pro',
   },
   'v4-pro': {
-    baseUrl: env('VITE_PRO_BASE_URL'),
-    model: env('VITE_PRO_MODEL_V4_PRO'),
+    baseUrl: env('VITE_PRO_BASE_URL', ''),
+    model: env('VITE_PRO_MODEL_V4_PRO', ''),
     type: 'openai', label: 'Model v4 Pro', mode: 'pro', badge: null, group: 'pro',
   },
 }
@@ -94,7 +94,7 @@ export function isProviderConfigured(providerId) {
   if (!cfg) return false
   if (getCustomApiKey(providerId, cfg.group)) return true
   if (ENV_KEYS[cfg.group]) return true
-  return false
+  return true
 }
 
 function toApiMessages(messages, providerType) {

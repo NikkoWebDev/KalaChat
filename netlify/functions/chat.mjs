@@ -60,12 +60,7 @@ export default async (req) => {
   }
 
   const group = config.group
-  const VITE_KEY_MAP = {
-    openrouter: 'VITE_OPENROUTER_API_KEY',
-    gemini: 'VITE_GEMINI_API_KEY',
-    pro: 'VITE_PRO_API_KEY',
-  }
-  const apiKey = body.apiKey || process.env[VITE_KEY_MAP[group]] || process.env[`API_KEY_${group.toUpperCase()}`] || ''
+  const apiKey = body.apiKey || process.env[`API_KEY_${group.toUpperCase()}`] || ''
   if (!apiKey) {
     return new Response(`API key not configured for ${config.group}`, {
       status: 503,
