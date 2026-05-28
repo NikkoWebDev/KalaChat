@@ -1,0 +1,36 @@
+---
+---
+
+<aside
+  id="sidebar"
+  role="navigation"
+  aria-label="Conversaciones"
+  class="fixed top-0 left-0 bottom-0 w-[85%] max-w-[340px] z-50 flex flex-col
+    bg-surface-400 border-r border-surface-700 shadow-[4px_0_24px_rgba(0,0,0,0.8)]
+    -translate-x-full transition-transform duration-[350ms] will-change-transform
+    lg:relative lg:translate-x-0 lg:shadow-none lg:z-auto lg:flex
+    [.sidebar-open_&]:translate-x-0"
+>
+  <div class="flex items-center justify-between px-4 pb-4 pt-3 safe-top border-b border-surface-800">
+    <div class="flex items-center gap-2.5">
+      <div class="w-8 h-8 rounded-[10px] bg-gold/10 text-gold flex items-center justify-center font-display text-lg font-bold">
+        K
+      </div>
+      <span class="text-base font-bold tracking-tight">KalaChat</span>
+    </div>
+    <button id="new-chat-btn-side" class="w-9 h-9 rounded-[10px] flex items-center justify-center text-surface-200 hover:bg-gold/10 hover:text-gold transition-all duration-200" aria-label="Nueva conversación" title="Nuevo chat">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+
+  <div id="conversation-list" class="flex-1 overflow-y-auto p-2"></div>
+
+  <div class="px-4 py-3 safe-bottom border-t border-surface-800">
+    <button id="settings-btn" class="flex items-center gap-2.5 w-full px-3.5 py-2.5 rounded-xl text-surface-200 hover:bg-gold/10 hover:text-gold transition-all duration-200 text-sm">
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" stroke="currentColor" stroke-width="1.5"/><path d="M16.167 10.75a1.334 1.334 0 00.267 1.475l.05.05a1.625 1.625 0 11-2.3 2.3l-.05-.05a1.333 1.333 0 00-1.475-.267 1.334 1.334 0 00-.809 1.225v.142a1.625 1.625 0 11-3.25 0v-.075a1.334 1.334 0 00-.875-1.225 1.333 1.333 0 00-1.475.267l-.05.05a1.625 1.625 0 11-2.3-2.3l.05-.05a1.334 1.334 0 00.267-1.475 1.334 1.334 0 00-1.225-.809h-.142a1.625 1.625 0 110-3.25h.075a1.334 1.334 0 001.225-.875 1.333 1.333 0 00-.267-1.475l-.05-.05a1.625 1.625 0 112.3-2.3l.05.05a1.333 1.333 0 001.475.267h.067a1.334 1.334 0 00.808-1.225v-.142a1.625 1.625 0 113.25 0v.075a1.334 1.334 0 00.809 1.225 1.333 1.333 0 001.475-.267l.05-.05a1.625 1.625 0 112.3 2.3l-.05.05a1.334 1.334 0 00-.267 1.475v.067a1.334 1.334 0 001.225.808h.142a1.625 1.625 0 010 3.25h-.075a1.334 1.334 0 00-1.225.809z" stroke="currentColor" stroke-width="1.5"/></svg>
+      <span>Configuración</span>
+    </button>
+  </div>
+</aside>
+
+<div id="sidebar-overlay" class="fixed inset-0 z-40 bg-black/65 opacity-0 pointer-events-none transition-opacity duration-300 backdrop-blur-sm [.sidebar-open_&]:opacity-100 [.sidebar-open_&]:pointer-events-auto lg:hidden" aria-hidden="true"></div>

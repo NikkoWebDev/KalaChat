@@ -1,0 +1,25 @@
+---
+---
+
+<div id="messages-container" class="flex-1 overflow-y-auto overflow-x-hidden flex flex-col scroll-smooth relative">
+  <div id="empty-state" class="flex flex-col items-center justify-center flex-1 px-6 py-8 text-center animate-fade-in">
+    <div class="mb-5 text-surface-200/60">
+      <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+        <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="1.5" stroke-opacity="0.15"/>
+        <path d="M32 20v16M24 28h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-opacity="0.3"/>
+        <text x="32" y="40" font-family="Instrument Serif, Georgia, serif" font-size="20" fill="currentColor" text-anchor="middle" opacity="0.4">K</text>
+      </svg>
+    </div>
+    <h2 class="font-display text-2xl font-normal text-surface-100 mb-2 tracking-tight lg:text-[28px]">¿En qué puedo ayudarte?</h2>
+    <p class="text-sm text-surface-200 mb-7 leading-relaxed">Pregúntame lo que sea, estoy aquí para ti</p>
+    <div class="flex flex-wrap justify-center gap-2 max-w-[360px]">
+      <button class="suggestion-chip px-4 py-2 rounded-full text-sm text-surface-200 border border-surface-700 bg-surface-400 hover:bg-gold/10 hover:border-gold hover:text-gold transition-all duration-250 whitespace-nowrap" data-prompt="Explica un concepto complejo de forma sencilla">Explica algo complejo</button>
+      <button class="suggestion-chip px-4 py-2 rounded-full text-sm text-surface-200 border border-surface-700 bg-surface-400 hover:bg-gold/10 hover:border-gold hover:text-gold transition-all duration-250 whitespace-nowrap" data-prompt="Ayúdame a escribir un correo profesional">Redacta un correo</button>
+      <button class="suggestion-chip px-4 py-2 rounded-full text-sm text-surface-200 border border-surface-700 bg-surface-400 hover:bg-gold/10 hover:border-gold hover:text-gold transition-all duration-250 whitespace-nowrap" data-prompt="Traduce este texto al inglés">Traduce un texto</button>
+      <button class="suggestion-chip px-4 py-2 rounded-full text-sm text-surface-200 border border-surface-700 bg-surface-400 hover:bg-gold/10 hover:border-gold hover:text-gold transition-all duration-250 whitespace-nowrap" data-prompt="Dame ideas creativas para un proyecto">Ideas creativas</button>
+    </div>
+  </div>
+
+  <div id="messages-list" class="flex flex-col gap-1.5 px-3 pb-2 pt-4 min-h-full justify-end lg:px-6 lg:pb-4 lg:pt-6"></div>
+  <div id="scroll-anchor" class="h-px shrink-0"></div>
+</div>

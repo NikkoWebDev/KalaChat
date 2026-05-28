@@ -1,0 +1,6 @@
+.env
+Variables de entorno.txt
+node_modules/
+dist/
+.DS_Store
+*.local

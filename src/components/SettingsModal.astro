@@ -1,0 +1,39 @@
+---
+---
+
+<div id="settings-modal" class="fixed inset-0 z-[200] flex items-center justify-center p-6 animate-fade-in hidden" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
+  <div class="modal-backdrop absolute inset-0 bg-black/65 backdrop-blur-md"></div>
+  <div class="modal-card-wide relative bg-surface-400 border border-surface-700 rounded-2xl px-6 pt-5 pb-5 max-w-[440px] w-full shadow-[0_16px_48px_rgba(0,0,0,0.8)] animate-modal-in">
+    <div class="flex items-center justify-between mb-5">
+      <h3 id="settings-modal-title" class="text-lg font-bold tracking-tight">Configuración</h3>
+      <button id="settings-close" class="w-9 h-9 rounded-[10px] flex items-center justify-center text-surface-200 hover:bg-gold/10 hover:text-gold transition-all duration-200" aria-label="Cerrar">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5l-10 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="max-h-[60vh] overflow-y-auto">
+      <div class="mb-5">
+        <h4 class="text-sm font-semibold mb-1.5">API Keys</h4>
+        <p class="text-xs text-surface-300 mb-3 leading-relaxed">Configura tus claves de API. Puedes usar variables de entorno o ingresarlas aquí.</p>
+        <div class="mb-3">
+          <label for="settings-openrouter" class="block text-xs font-medium text-surface-200 mb-1">OpenRouter API Key</label>
+          <input type="password" id="settings-openrouter" class="settings-input w-full px-3.5 py-2.5 rounded-xl bg-surface-500 border border-surface-700 text-sm text-surface-100 placeholder:text-surface-300 transition-colors duration-200 focus:border-gold focus:shadow-[0_0_0_2px_rgba(200,168,124,0.08)] focus:outline-none" placeholder="sk-or-..." />
+        </div>
+        <div class="mb-3">
+          <label for="settings-gemini" class="block text-xs font-medium text-surface-200 mb-1">Gemini API Key</label>
+          <input type="password" id="settings-gemini" class="settings-input w-full px-3.5 py-2.5 rounded-xl bg-surface-500 border border-surface-700 text-sm text-surface-100 placeholder:text-surface-300 transition-colors duration-200 focus:border-gold focus:shadow-[0_0_0_2px_rgba(200,168,124,0.08)] focus:outline-none" placeholder="AIza..." />
+        </div>
+        <div class="mb-3">
+          <label for="settings-pro" class="block text-xs font-medium text-surface-200 mb-1">DeepSeek API Key (PRO)</label>
+          <input type="password" id="settings-pro" class="settings-input w-full px-3.5 py-2.5 rounded-xl bg-surface-500 border border-surface-700 text-sm text-surface-100 placeholder:text-surface-300 transition-colors duration-200 focus:border-gold focus:shadow-[0_0_0_2px_rgba(200,168,124,0.08)] focus:outline-none" placeholder="sk-..." />
+        </div>
+      </div>
+      <div class="mb-5">
+        <h4 class="text-sm font-semibold mb-1.5">Acerca de</h4>
+        <p class="text-xs text-surface-300 leading-relaxed">KalaChat v1.0.0 · Los mensajes se procesan localmente. Las claves API se almacenan solo en tu navegador.</p>
+      </div>
+    </div>
+    <div class="flex gap-2 justify-end">
+      <button id="settings-save" class="px-5 py-2.5 rounded-xl text-sm font-semibold bg-gold text-surface hover:bg-gold-50 transition-all duration-200">Guardar</button>
+    </div>
+  </div>
+</div>

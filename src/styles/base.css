@@ -1,0 +1,156 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  *,*::before,*::after{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%;-moz-text-size-adjust:100%;text-size-adjust:100%;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
+  body{@apply m-0 overflow-hidden font-ui;height:100dvh;width:100dvw;position:fixed}
+  [data-theme="dark"] body{@apply text-surface-100}
+  [data-theme="light"] body{@apply text-[#1C1A16] bg-[#F5F3EE]}
+  img,svg{display:block}
+  button,input,textarea{font:inherit;color:inherit;@apply border-none bg-transparent outline-none}
+  button{cursor:pointer}
+  a{color:inherit;@apply no-underline}
+  ul,ol{list-style:none}
+  textarea{resize:none}
+  ::selection{@apply bg-gold/10 text-inherit}
+  ::-webkit-scrollbar{width:4px}
+  ::-webkit-scrollbar-track{@apply bg-transparent}
+  ::-webkit-scrollbar-thumb{@apply rounded-full}
+  [data-theme="dark"] ::-webkit-scrollbar-thumb{@apply bg-surface-700}
+  [data-theme="light"] ::-webkit-scrollbar-thumb{@apply bg-[#E2DED6]}
+}
+
+@layer components {
+  /* --- Messages (dynamic) --- */
+  .message{@apply flex gap-2 max-w-[88%] animate-message-slide lg:max-w-[72%] xl:max-w-[65%]}
+  .message.user{@apply self-end flex-row-reverse}
+  .message.assistant{@apply self-start}
+  .message-avatar{@apply w-7 h-7 rounded-lg shrink-0 flex items-center justify-center text-xs font-semibold mt-1}
+  .message.user .message-avatar{@apply bg-gold/10 text-gold}
+  [data-theme="dark"] .message.assistant .message-avatar{@apply bg-surface-500 text-surface-300 font-display text-sm}
+  [data-theme="light"] .message.assistant .message-avatar{@apply bg-[#FAF8F4] text-[#A29E98] font-display text-sm}
+  .message-content{@apply min-w-0}
+  .message-bubble{@apply relative px-3.5 py-2.5 rounded-2xl text-[15px] leading-relaxed break-words}
+  .message.user .message-bubble{@apply rounded-br-md}
+  [data-theme="dark"] .message.user .message-bubble{@apply bg-[#1A1A1E] text-surface-100}
+  [data-theme="light"] .message.user .message-bubble{@apply bg-[#E8E4DC] text-[#1C1A16]}
+  [data-theme="dark"] .message.assistant .message-bubble{@apply bg-surface-400 border border-surface-800 rounded-bl-md border-l-2 border-l-gold text-surface-100}
+  [data-theme="light"] .message.assistant .message-bubble{@apply bg-white border border-[#EEEAE2] rounded-bl-md border-l-2 border-l-[#A8855A] text-[#1C1A16]}
+  .message-time{@apply text-[10px] text-surface-300 mt-1 tracking-wide px-1}
+  .message.user .message-time{@apply text-right}
+
+  /* --- Message content styles --- */
+  .message-bubble p{@apply mb-2 last:mb-0}
+  .message-bubble strong{@apply font-semibold}
+  .message-bubble em{@apply italic}
+  .message-bubble ul,.message-bubble ol{@apply pl-5 mb-2}
+  .message-bubble li{@apply mb-1}
+  .message-bubble ul li{list-style:disc}
+  .message-bubble ol li{list-style:decimal}
+  .message-bubble blockquote{@apply border-l-2 border-gold pl-3 my-2 italic}
+  [data-theme="dark"] .message-bubble blockquote{@apply text-surface-200}
+  [data-theme="light"] .message-bubble blockquote{@apply text-[#7A7670]}
+  .message-bubble h1,.message-bubble h2,.message-bubble h3,.message-bubble h4{@apply font-semibold my-3 mb-1.5 tracking-tight}
+  .message-bubble h1{@apply text-[17px]}
+  .message-bubble h2{@apply text-[16px]}
+  .message-bubble h3{@apply text-[15px]}
+  .message-bubble a{@apply text-gold underline underline-offset-2 hover:text-gold-50}
+  .message-bubble hr{@apply border-0 border-t my-3}
+  [data-theme="dark"] .message-bubble hr{@apply border-surface-700}
+  [data-theme="light"] .message-bubble hr{@apply border-[#E2DED6]}
+
+  /* --- Code blocks --- */
+  .code-block-wrapper{@apply my-2.5 rounded-xl overflow-hidden border}
+  [data-theme="dark"] .code-block-wrapper{@apply border-surface-700 bg-[#08080A]}
+  [data-theme="light"] .code-block-wrapper{@apply border-[#E2DED6] bg-[#FAFAFA]}
+  .code-block-header{@apply flex items-center justify-between px-3 py-2 border-b}
+  [data-theme="dark"] .code-block-header{@apply bg-surface-500 border-surface-700}
+  [data-theme="light"] .code-block-header{@apply bg-[#F0EDE6] border-[#E2DED6]}
+  .code-block-lang{@apply text-[11px] font-medium text-surface-300 uppercase tracking-wide}
+  .code-copy-btn{@apply flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium text-surface-300 transition-all duration-200 hover:bg-gold/10 hover:text-gold}
+  .code-copy-btn.copied{@apply text-green-400}
+  .code-block-wrapper pre{@apply m-0 px-4 py-3.5 overflow-x-auto text-[13px] leading-relaxed font-mono}
+  .code-block-wrapper pre::-webkit-scrollbar{height:3px}
+  .code-block-wrapper code{@apply font-mono text-[13px]}
+  .inline-code{@apply px-1.5 py-0.5 rounded font-mono text-[13px] border}
+  [data-theme="dark"] .inline-code{@apply bg-surface-500 text-gold border-surface-800}
+  [data-theme="light"] .inline-code{@apply bg-[#FAF8F4] text-[#A8855A] border-[#EEEAE2]}
+
+  /* --- Prism overrides --- */
+  .token.comment,.token.prolog,.token.doctype,.token.cdata{color:#6B7280;font-style:italic}
+  .token.punctuation{color:#9CA3AF}
+  .token.property,.token.tag,.token.boolean,.token.number,.token.constant,.token.symbol,.token.deleted{color:#F472B6}
+  .token.selector,.token.attr-name,.token.string,.token.char,.token.builtin,.token.inserted{color:#34D399}
+  .token.operator,.token.entity,.token.url{color:#C8A87C}
+  .token.atrule,.token.attr-value,.token.keyword{color:#818CF8}
+  .token.function,.token.class-name{color:#C8A87C}
+  .token.regex,.token.important,.token.variable{color:#FBBF24}
+  .token.important,.token.bold{font-weight:700}
+  .token.italic{font-style:italic}
+
+  /* --- Typing indicator --- */
+  .typing-indicator{@apply flex items-center gap-1 px-4 py-3.5 rounded-2xl border max-w-[88%] self-start animate-message-slide}
+  [data-theme="dark"] .typing-indicator{@apply bg-surface-400 border-surface-800 rounded-bl-md border-l-2 border-l-gold}
+  [data-theme="light"] .typing-indicator{@apply bg-white border-[#EEEAE2] rounded-bl-md border-l-2 border-l-[#A8855A]}
+  .typing-dot{@apply w-[7px] h-[7px] rounded-full bg-surface-300 animate-pulse-dot}
+  .typing-dot:nth-child(2){animation-delay:.2s}
+  .typing-dot:nth-child(3){animation-delay:.4s}
+
+  /* --- Streaming cursor --- */
+  .streaming-cursor{@apply inline-block w-[2px] h-4 align-text-bottom ml-0.5 bg-gold}
+  .streaming-cursor{animation:blink 1s step-end infinite}
+  @keyframes blink{50%{opacity:0}}
+
+  /* --- Conversation list items --- */
+  .conversation-item{@apply px-3.5 py-3 rounded-xl cursor-pointer transition-colors duration-200 mb-0.5 relative}
+  .conversation-item:hover{@apply bg-gold/10}
+  [data-theme="dark"] .conversation-item.active{@apply bg-gold/15}
+  [data-theme="light"] .conversation-item.active{@apply bg-[rgba(168,133,90,0.12)]}
+  .conversation-item-title{@apply text-sm font-medium text-surface-100 truncate mb-0.5}
+  [data-theme="light"] .conversation-item-title{@apply text-[#1C1A16]}
+  .conversation-item-meta{@apply text-[11px] text-surface-300 flex gap-2 truncate}
+  .conversation-item .delete-btn{@apply absolute right-2 top-1/2 -translate-y-1/2 opacity-0 w-7 h-7 rounded-lg flex items-center justify-center text-surface-300 transition-all duration-200}
+  .conversation-item:hover .delete-btn{opacity:1}
+  .conversation-item .delete-btn:hover{@apply bg-gold/10 text-red-500}
+  .empty-conversations{@apply px-4 py-6 text-center text-surface-300 text-sm}
+
+  /* --- Dropdown items --- */
+  .dropdown-item{@apply flex items-center justify-between w-full px-2.5 py-2 rounded-lg text-sm text-surface-100 transition-colors duration-200 text-left}
+  .dropdown-item:hover,.dropdown-item[aria-selected="true"]{@apply bg-gold/10}
+  .dropdown-item-name{@apply font-medium}
+  .dropdown-item-badge{@apply text-[10px] px-1.5 py-0.5 rounded-md font-semibold}
+  .free-badge{@apply bg-green-500/10 text-green-400}
+  .pro-badge{@apply bg-gold/10 text-gold}
+
+  /* --- Mode switch active states --- */
+  .mode-btn.active{@apply bg-surface-600 text-surface-100}
+  .mode-btn[data-mode="free"].active{@apply text-green-400}
+  .mode-btn[data-mode="pro"].active{@apply text-gold}
+  .mode-btn[data-mode="free"].active .free-dot{@apply bg-green-400}
+  .mode-btn[data-mode="free"].active .free-dot{box-shadow:0 0 6px rgba(52,211,153,0.4)}
+  .mode-btn[data-mode="pro"].active .pro-dot{@apply bg-gold}
+  .mode-btn[data-mode="pro"].active .pro-dot{box-shadow:0 0 6px rgba(200,168,124,0.4)}
+
+  /* --- Toast --- */
+  .toast{@apply fixed bottom-20 left-1/2 -translate-x-1/2 z-[300] px-4 py-2.5 rounded-xl text-sm shadow-[0_8px_24px_rgba(0,0,0,0.8)] animate-toast-in}
+  [data-theme="dark"] .toast{@apply bg-surface-500 border border-surface-700 text-surface-100}
+  [data-theme="light"] .toast{@apply bg-[#FAF8F4] border border-[#E2DED6] text-[#1C1A16]}
+
+  /* --- Provider cost badges --- */
+  .provider-cost{@apply text-[10px] px-1.5 py-0.5 rounded-md font-semibold tracking-wide}
+  .free-cost{@apply bg-green-500/10 text-green-400}
+  .pro-cost{@apply bg-gold/10 text-gold}
+
+  /* --- Light mode overrides for theme btn --- */
+  [data-theme="light"] .theme-sun{display:none}
+  [data-theme="light"] .theme-moon{display:block}
+  .theme-sun{display:block}
+  .theme-moon{display:none}
+}
+
+@layer utilities {
+  .safe-top{padding-top:env(safe-area-inset-top,0px)}
+  .safe-bottom{padding-bottom:env(safe-area-inset-bottom,0px)}
+}

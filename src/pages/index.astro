@@ -1,0 +1,23 @@
+---
+import Layout from '../layouts/Layout.astro'
+import Sidebar from '../components/Sidebar.astro'
+import Header from '../components/Header.astro'
+import MessagesContainer from '../components/MessagesContainer.astro'
+import InputArea from '../components/InputArea.astro'
+import CostModal from '../components/CostModal.astro'
+import SettingsModal from '../components/SettingsModal.astro'
+---
+
+<Layout>
+  <div id="app" class="flex h-dvh w-dvw overflow-hidden relative bg-surface">
+    <Sidebar />
+    <main id="main" class="main-area flex-1 flex flex-col min-w-0 relative h-dvh bg-surface transition-all duration-300 [.sidebar-open_&]:blur-sm [.sidebar-open_&]:pointer-events-none lg:[.sidebar-open_&]:blur-none lg:[.sidebar-open_&]:pointer-events-auto">
+      <Header />
+      <MessagesContainer />
+      <InputArea />
+    </main>
+  </div>
+
+  <CostModal />
+  <SettingsModal />
+</Layout>
