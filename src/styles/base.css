@@ -151,6 +151,12 @@
 }
 
 @layer utilities {
+  /* --- File chips --- */
+  .file-chip{@apply flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-gold/10 text-gold border border-gold/20 max-w-[180px] animate-fade-in}
+  .file-chip-name{@apply truncate}
+  .file-chip-remove{@apply w-4 h-4 rounded flex items-center justify-center text-gold/60 hover:text-gold hover:bg-gold/20 transition-colors duration-150 leading-none text-sm font-bold shrink-0}
+  .file-chip-remove:hover{@apply bg-gold/20}
+
   .safe-top{padding-top:env(safe-area-inset-top,0px)}
   .safe-bottom{padding-bottom:env(safe-area-inset-bottom,0px)}
 }
