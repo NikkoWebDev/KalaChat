@@ -4,7 +4,7 @@
 
 @layer base {
   *,*::before,*::after{box-sizing:border-box}
-  html{-webkit-text-size-adjust:100%;-moz-text-size-adjust:100%;text-size-adjust:100%;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
+  html{-webkit-text-size-adjust:100%;-moz-text-size-adjust:100%;text-size-adjust:100%;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;background-color:var(--bg-surface);color:var(--text-primary);transition:background-color .45s ease,color .35s ease}
   body{@apply m-0 overflow-hidden font-ui;height:100dvh;width:100dvw;position:fixed}
   [data-theme="dark"] body{@apply text-surface-100}
   [data-theme="light"] body{@apply text-[#1C1A16] bg-[#F5F3EE]}
@@ -15,11 +15,16 @@
   ul,ol{list-style:none}
   textarea{resize:none}
   ::selection{@apply bg-gold/10 text-inherit}
-  ::-webkit-scrollbar{width:4px}
+  ::-webkit-scrollbar{width:4px;height:4px}
   ::-webkit-scrollbar-track{@apply bg-transparent}
   ::-webkit-scrollbar-thumb{@apply rounded-full}
   [data-theme="dark"] ::-webkit-scrollbar-thumb{@apply bg-surface-700}
-  [data-theme="light"] ::-webkit-scrollbar-thumb{@apply bg-[#E2DED6]}
+  [data-theme="dark"] ::-webkit-scrollbar-thumb:hover{@apply bg-surface-600}
+  [data-theme="light"] ::-webkit-scrollbar-thumb{@apply bg-[#D6D2CA]}
+  [data-theme="light"] ::-webkit-scrollbar-thumb:hover{@apply bg-[#C2BEB6]}
+
+  /* Smooth bg transitions for themed elements */
+  #app,.main-area,#sidebar,#input-area,.modal-backdrop,.message-bubble,.code-block-wrapper,.conversation-item,.toast{transition:background-color .45s ease,border-color .35s ease,box-shadow .35s ease}
 }
 
 @layer components {
@@ -40,6 +45,10 @@
   [data-theme="light"] .message.assistant .message-bubble{@apply bg-white border border-[#EEEAE2] rounded-bl-md border-l-2 border-l-[#A8855A] text-[#1C1A16]}
   .message-time{@apply text-[10px] text-surface-300 mt-1 tracking-wide px-1}
   .message.user .message-time{@apply text-right}
+
+  /* --- Image in messages --- */
+  .msg-image-wrap{@apply mb-2 rounded-xl overflow-hidden border border-surface-700/50 bg-surface-500/50}
+  .msg-image{@apply w-auto max-w-full max-h-60 object-contain mx-auto}
 
   /* --- Message content styles --- */
   .message-bubble p{@apply mb-2 last:mb-0}
@@ -64,6 +73,7 @@
   /* --- Code blocks --- */
   .code-block-wrapper{@apply my-2.5 rounded-xl overflow-hidden border}
   [data-theme="dark"] .code-block-wrapper{@apply border-surface-700 bg-[#08080A]}
+  [data-theme="dark"] .code-block-wrapper:hover{@apply border-surface-600}
   [data-theme="light"] .code-block-wrapper{@apply border-[#E2DED6] bg-[#FAFAFA]}
   .code-block-header{@apply flex items-center justify-between px-3 py-2 border-b}
   [data-theme="dark"] .code-block-header{@apply bg-surface-500 border-surface-700}
@@ -148,15 +158,24 @@
   [data-theme="light"] .theme-moon{display:block}
   .theme-sun{display:block}
   .theme-moon{display:none}
-}
 
-@layer utilities {
   /* --- File chips --- */
-  .file-chip{@apply flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-gold/10 text-gold border border-gold/20 max-w-[180px] animate-fade-in}
-  .file-chip-name{@apply truncate}
+  .file-chip{@apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-gold/10 text-gold border border-gold/20 max-w-[200px] animate-fade-in overflow-hidden}
+  .file-chip-image{@apply pl-1}
+  .file-chip-preview{@apply w-5 h-5 rounded object-cover shrink-0}
+  .file-chip-icon{@apply text-[10px] font-bold uppercase text-gold/60 shrink-0}
+  .file-chip-name{@apply truncate min-w-0 flex-1}
   .file-chip-remove{@apply w-4 h-4 rounded flex items-center justify-center text-gold/60 hover:text-gold hover:bg-gold/20 transition-colors duration-150 leading-none text-sm font-bold shrink-0}
   .file-chip-remove:hover{@apply bg-gold/20}
 
+  /* --- Keyboard shortcut keys --- */
+  .shortcut-key{@apply inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-mono font-medium bg-surface-500 border border-surface-700 text-surface-200}
+
+  /* --- Modal overlay class (for backdrop close) --- */
+  .modal-overlay{cursor:default}
+}
+
+@layer utilities {
   .safe-top{padding-top:env(safe-area-inset-top,0px)}
   .safe-bottom{padding-bottom:env(safe-area-inset-bottom,0px)}
 }

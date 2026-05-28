@@ -116,6 +116,14 @@ export async function parseMarkdown(text) {
   })
 }
 
+function renderImages(images) {
+  if (!images?.length) return ''
+  return images.map(img => {
+    const dataUrl = `data:${img.mime};base64,${img.base64}`
+    return `<div class="msg-image-wrap"><img src="${dataUrl}" alt="${escapeHtml(img.name)}" class="msg-image" loading="lazy" /></div>`
+  }).join('')
+}
+
 export async function renderMessage(message) {
   const div = document.createElement('div')
   div.className = `message ${message.role}`
@@ -124,6 +132,8 @@ export async function renderMessage(message) {
   const content = message.role === 'assistant'
     ? await parseMarkdown(message.content)
     : escapeHtml(message.content).replace(/\n/g, '<br>')
+
+  const imagesHtml = message.role === 'user' ? renderImages(message.images) : ''
 
   const time = message.timestamp
     ? formatTime(message.timestamp)
@@ -136,7 +146,7 @@ export async function renderMessage(message) {
   div.innerHTML = `
     ${avatar}
     <div class="message-content">
-      <div class="message-bubble">${content}</div>
+      <div class="message-bubble">${imagesHtml}${content}</div>
       <div class="message-time">${time}</div>
     </div>`
 

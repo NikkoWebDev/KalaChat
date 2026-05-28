@@ -4,7 +4,7 @@ import {
   finalizeStreamingContent, renderTypingIndicator, removeTypingIndicator,
   formatConversationDate, setupCopyButtons, initRenderer
 } from './chat.js'
-import { escapeHtml } from './utils.js'
+import { escapeHtml, fileToBase64 } from './utils.js'
 import { STORAGE_KEYS, DEFAULTS, UI } from './constants.js'
 
 let abortController = null
@@ -27,7 +27,7 @@ function cacheElements() {
     'conversation-list', 'new-chat-btn-side', 'settings-btn',
     'settings-modal', 'settings-close', 'settings-save',
     'settings-openrouter', 'settings-gemini', 'settings-pro',
-    'file-input', 'attach-btn', 'file-list',
+    'file-input', 'attach-btn', 'file-list', 'settings-provider-info',
   ]
   ids.forEach(id => { el[id] = $(`#${id}`) })
   el.modeBtns = $$('.mode-btn')
@@ -37,9 +37,6 @@ function cacheElements() {
     gemini: el['settings-gemini'],
     pro: el['settings-pro'],
   }
-  el.costModalAccept = el['cost-modal-accept']
-  el.costModalCancel = el['cost-modal-cancel']
-  el.dontShowAgain = el['dont-show-again']
 }
 
 function loadState() {
@@ -75,6 +72,7 @@ function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme)
   state.theme = theme
   saveState()
+  updateSettingsProviderInfo()
 }
 
 function toggleSidebar() { document.body.classList.toggle('sidebar-open') }
@@ -127,6 +125,7 @@ function updateProviderUI() {
   el['dropdown-pro-group']?.querySelectorAll('.dropdown-item').forEach(item => {
     item.setAttribute('aria-selected', item.dataset.provider === state.provider)
   })
+  updateSettingsProviderInfo()
 }
 
 function doSetMode(mode) {
@@ -339,7 +338,7 @@ function showToast(message) {
 
 async function sendMessage() {
   const text = el['message-input']?.value.trim() || ''
-  if (!text || state.sending) return
+  if ((!text && currentFiles.length === 0) || state.sending) return
 
   let conv = getCurrentConversation()
   if (!conv) conv = createNewConversation()
@@ -355,22 +354,29 @@ async function sendMessage() {
   el['message-input'].disabled = true
   if (el['empty-state']) el['empty-state'].style.display = 'none'
 
+  const images = currentFiles.filter(f => f.type === 'image').map(f => ({
+    name: f.name, base64: f.base64, mime: f.mime,
+  }))
+  const textFiles = currentFiles.filter(f => f.type !== 'image')
+
   let messageText = text
 
-  if (currentFiles.length > 0) {
-    const fileBlocks = currentFiles.map(f =>
+  if (textFiles.length > 0) {
+    const fileBlocks = textFiles.map(f =>
       `[Archivo: ${f.name}]\n\`\`\`\n${f.content}\n\`\`\``
     ).join('\n\n')
     messageText = `${fileBlocks}\n\n${text}`
-    currentFiles = []
-    renderFileList()
   }
+
+  currentFiles = []
+  renderFileList()
 
   const userMsg = {
     id: `msg_${Date.now()}`,
     role: 'user',
     content: messageText,
     timestamp: Date.now(),
+    ...(images.length ? { images } : {}),
   }
 
   conv.messages.push(userMsg)
@@ -402,7 +408,11 @@ async function sendMessage() {
   abortController = new AbortController()
 
   try {
-    const messagesForApi = conv.messages.map(m => ({ role: m.role, content: m.content }))
+    const messagesForApi = conv.messages.map(m => ({
+      role: m.role,
+      content: m.content,
+      ...(m.images?.length ? { images: m.images } : {}),
+    }))
 
     for await (const chunk of streamChat(messagesForApi, {
       provider: state.provider,
@@ -465,12 +475,16 @@ const TEXT_EXTENSIONS = new Set([
   'typ','tsv','properties','cfg','desktop','service','rules','patch','diff',
 ])
 
-function isTextFile(file) {
+const IMAGE_EXTENSIONS = new Set(['jpg','jpeg','png','gif','webp','bmp','avif'])
+
+function classifyFile(file) {
   const ext = file.name.split('.').pop()?.toLowerCase()
-  if (!ext) return file.type.startsWith('text/')
-  if (TEXT_EXTENSIONS.has(ext) || TEXT_EXTENSIONS.has(file.name)) return true
-  if (['jpg','jpeg','png','gif','bmp','webp','ico','svg','tiff','avif'].includes(ext)) return false
-  return file.type.startsWith('text/') || !file.type
+  if (!ext) return file.type.startsWith('text/') ? 'text' : null
+  if (TEXT_EXTENSIONS.has(ext) || TEXT_EXTENSIONS.has(file.name)) return 'text'
+  if (IMAGE_EXTENSIONS.has(ext)) return 'image'
+  if (file.type.startsWith('text/')) return 'text'
+  if (file.type.startsWith('image/') && !file.type.includes('svg')) return 'image'
+  return null
 }
 
 async function handleFileSelect(files) {
@@ -480,25 +494,32 @@ async function handleFileSelect(files) {
       break
     }
 
-    if (file.size > 500 * 1024) {
-      showToast(`"${file.name}" excede 500 KB`)
+    if (file.size > 2 * 1024 * 1024) {
+      showToast(`"${file.name}" excede 2 MB`)
       continue
     }
 
-    if (!isTextFile(file)) {
-      showToast(`"${file.name}" no es un archivo de texto compatible`)
+    const type = classifyFile(file)
+    if (!type) {
+      showToast(`"${file.name}" no es compatible`)
       continue
     }
 
     try {
-      const text = await file.text()
-      currentFiles.push({ name: file.name, content: text })
+      if (type === 'image') {
+        const base64 = await fileToBase64(file)
+        const mime = file.type || 'image/png'
+        currentFiles.push({ type: 'image', name: file.name, base64, mime })
+      } else {
+        const text = await file.text()
+        currentFiles.push({ type: 'text', name: file.name, content: text })
+      }
     } catch {
       showToast(`No se pudo leer "${file.name}"`)
     }
   }
   renderFileList()
-  el['message-input'].focus()
+  el['message-input']?.focus()
 }
 
 function renderFileList() {
@@ -511,7 +532,11 @@ function renderFileList() {
 
   el['file-list'].hidden = false
   el['file-list'].innerHTML = currentFiles.map((f, i) =>
-    `<span class="file-chip" title="${escapeHtml(f.name)}">
+    `<span class="file-chip ${f.type === 'image' ? 'file-chip-image' : ''}" title="${escapeHtml(f.name)}">
+      ${f.type === 'image'
+        ? `<img src="data:${f.mime};base64,${f.base64}" class="file-chip-preview" alt="" />`
+        : `<span class="file-chip-icon">${f.name.split('.').pop()}</span>`
+      }
       <span class="file-chip-name">${escapeHtml(f.name)}</span>
       <button class="file-chip-remove" data-index="${i}" aria-label="Quitar ${escapeHtml(f.name)}">&times;</button>
     </span>`
@@ -535,6 +560,27 @@ function loadSettingsIntoUI() {
     if (el.settingsInputs.gemini) el.settingsInputs.gemini.value = saved.gemini?.apiKey || ''
     if (el.settingsInputs.pro) el.settingsInputs.pro.value = saved.pro?.apiKey || ''
   } catch { /* use env defaults */ }
+  updateSettingsProviderInfo()
+}
+
+function updateSettingsProviderInfo() {
+  const prov = getAvailableProviders(state.mode).find(p => p.id === state.provider)
+  const info = el['settings-provider-info']
+  if (!info) return
+  if (prov) {
+    info.innerHTML = `
+      <div class="flex items-center gap-2 mb-1">
+        <span class="text-sm font-semibold">${escapeHtml(prov.label)}</span>
+        <span class="text-[10px] px-1.5 py-0.5 rounded-md font-semibold ${state.mode === 'free' ? 'bg-green-500/10 text-green-400' : 'bg-gold/10 text-gold'}">${state.mode === 'free' ? 'Gratuito' : 'PRO'}</span>
+      </div>
+      <div class="flex items-center gap-3 text-xs text-surface-300">
+        <span>Tema: ${state.theme === 'dark' ? 'oscuro' : 'claro'}</span>
+        <span>·</span>
+        <span>Modelos: ${state.mode === 'free' ? getAvailableProviders('free').length : getAvailableProviders('pro').length} disp.</span>
+      </div>`
+  } else {
+    info.innerHTML = '<span class="text-xs text-surface-300">Ningún proveedor seleccionado</span>'
+  }
 }
 
 function initProviders() {
@@ -559,12 +605,20 @@ async function start() {
 
   setupCopyButtons(el['messages-list'])
 
+  // --- Provider dropdown (fixed positioning to avoid overflow: hidden) ---
   if (el['provider-selector']) {
     el['provider-selector'].addEventListener('click', e => {
       e.stopPropagation()
-      if (el['provider-dropdown']) {
-        el['provider-dropdown'].hidden = !el['provider-dropdown'].hidden
+      const dd = el['provider-dropdown']
+      if (!dd) return
+      if (dd.hidden) {
+        const rect = el['provider-selector'].getBoundingClientRect()
+        dd.style.position = 'fixed'
+        dd.style.top = (rect.bottom + 4) + 'px'
+        dd.style.left = rect.left + 'px'
+        dd.style.minWidth = Math.max(rect.width, 220) + 'px'
       }
+      dd.hidden = !dd.hidden
     })
   }
 
@@ -572,19 +626,23 @@ async function start() {
     if (el['provider-dropdown']) el['provider-dropdown'].hidden = true
   })
 
+  // --- Theme toggle ---
   if (el['theme-btn']) {
     el['theme-btn'].addEventListener('click', () => {
       applyTheme(state.theme === 'dark' ? 'light' : 'dark')
     })
   }
 
+  // --- Mode buttons ---
   el.modeBtns.forEach(btn => {
     btn.addEventListener('click', () => setMode(btn.dataset.mode))
   })
 
+  // --- Sidebar ---
   if (el['menu-btn']) el['menu-btn'].addEventListener('click', toggleSidebar)
   if (el['sidebar-overlay']) el['sidebar-overlay'].addEventListener('click', closeSidebar)
 
+  // --- Settings ---
   if (el['settings-btn']) {
     el['settings-btn'].addEventListener('click', () => {
       closeSidebar()
@@ -622,6 +680,31 @@ async function start() {
     })
   }
 
+  // --- Settings theme options ---
+  const themeDark = $('#settings-theme-dark')
+  const themeLight = $('#settings-theme-light')
+  function updateSettingsThemeBtns() {
+    const active = state.theme
+    ;[themeDark, themeLight].forEach(btn => {
+      if (!btn) return
+      const isActive = btn.dataset.themeOption === active
+      btn.setAttribute('data-active', isActive ? '' : null)
+      btn.className = `theme-option flex-1 flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-sm font-medium border transition-all duration-200 ${
+        isActive
+          ? 'bg-gold/10 border-gold text-gold'
+          : 'bg-surface-500 border-surface-700 text-surface-200 hover:bg-gold/10 hover:border-gold/30'
+      }`
+    })
+  }
+  ;[themeDark, themeLight].forEach(btn => {
+    btn?.addEventListener('click', () => {
+      applyTheme(btn.dataset.themeOption)
+      updateSettingsThemeBtns()
+    })
+  })
+  updateSettingsThemeBtns()
+
+  // --- Modal backdrop clicks ---
   $$('.modal-overlay').forEach(modal => {
     modal.addEventListener('click', e => {
       if (e.target === modal || e.target.classList.contains('modal-backdrop')) {
@@ -630,12 +713,14 @@ async function start() {
     })
   })
 
+  // --- Message input ---
   if (el['message-input']) {
     el['message-input'].addEventListener('input', () => {
       el['message-input'].style.height = 'auto'
       el['message-input'].style.height = Math.min(el['message-input'].scrollHeight, UI.maxInputHeight) + 'px'
       if (el['send-btn']) {
-        el['send-btn'].disabled = !el['message-input'].value.trim() || state.sending
+        const hasText = el['message-input'].value.trim().length > 0
+        el['send-btn'].disabled = !hasText && currentFiles.length === 0 || state.sending
       }
     })
 
@@ -651,6 +736,7 @@ async function start() {
     el['send-btn'].addEventListener('click', sendMessage)
   }
 
+  // --- Suggestion chips ---
   el.suggestionChips.forEach(chip => {
     chip.addEventListener('click', () => {
       if (el['message-input']) {
@@ -659,10 +745,11 @@ async function start() {
         el['message-input'].style.height = Math.min(el['message-input'].scrollHeight, UI.maxInputHeight) + 'px'
       }
       if (el['send-btn']) el['send-btn'].disabled = false
-      el['message-input'].focus()
+      el['message-input']?.focus()
     })
   })
 
+  // --- New chat ---
   if (el['new-chat-btn-side']) {
     el['new-chat-btn-side'].addEventListener('click', () => {
       createNewConversation()
@@ -670,6 +757,7 @@ async function start() {
     })
   }
 
+  // --- Keyboard shortcuts ---
   document.addEventListener('keydown', e => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       sendMessage()
@@ -680,6 +768,7 @@ async function start() {
     }
   })
 
+  // --- File attach ---
   if (el['attach-btn'] && el['file-input']) {
     el['attach-btn'].addEventListener('click', () => {
       el['file-input'].click()
@@ -693,6 +782,7 @@ async function start() {
     })
   }
 
+  // --- Load settings overrides ---
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEYS.SETTINGS) || '{}')
     setSettingsOverrides(saved)
@@ -701,6 +791,7 @@ async function start() {
     if (el.settingsInputs.pro) el.settingsInputs.pro.value = saved.pro?.apiKey || ''
   } catch { /* ignore */ }
 
+  // --- Init UI ---
   applyTheme(state.theme)
   doSetMode(state.mode)
   buildDropdown()

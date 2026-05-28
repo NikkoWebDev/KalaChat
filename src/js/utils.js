@@ -1,3 +1,16 @@
+export function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result
+      const base64 = result.split(',')[1] || result
+      resolve(base64)
+    }
+    reader.onerror = () => reject(new Error(`Error reading ${file.name}`))
+    reader.readAsDataURL(file)
+  })
+}
+
 export function escapeHtml(str) {
   return str
     .replace(/&/g, '&amp;')

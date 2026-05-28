@@ -8,25 +8,25 @@
       <span id="provider-badge" class="free-cost text-[10px] px-1.5 py-0.5 rounded-md font-semibold tracking-wide bg-green-500/10 text-green-400">Gratuito</span>
       <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
+  </div>
 
-    <div id="provider-dropdown" class="absolute bottom-full left-3 mb-1 bg-surface-400 border border-surface-700 rounded-xl p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.8)] min-w-[200px] z-50 animate-dropdown-in origin-bottom-left hidden" role="listbox" aria-label="Modelos disponibles">
-      <div id="dropdown-free-group" class="py-0.5">
-        <div class="dropdown-group-label text-[10px] font-semibold text-surface-300 uppercase tracking-wide px-2.5 pb-1">Gratuitos</div>
-      </div>
-      <div id="dropdown-divider" class="h-px bg-surface-800 my-1 mx-1.5"></div>
-      <div id="dropdown-pro-group" class="py-0.5">
-        <div class="dropdown-group-label text-[10px] font-semibold text-surface-300 uppercase tracking-wide px-2.5 pb-1">PRO · Facturable</div>
-      </div>
+  <div id="provider-dropdown" class="bg-surface-400 border border-surface-700 rounded-xl p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.8)] min-w-[200px] z-[100] animate-dropdown-in origin-top-left hidden" role="listbox" aria-label="Modelos disponibles">
+    <div id="dropdown-free-group" class="py-0.5">
+      <div class="dropdown-group-label text-[10px] font-semibold text-surface-300 uppercase tracking-wide px-2.5 pb-1">Gratuitos</div>
+    </div>
+    <div id="dropdown-divider" class="h-px bg-surface-800 my-1 mx-1.5"></div>
+    <div id="dropdown-pro-group" class="py-0.5">
+      <div class="dropdown-group-label text-[10px] font-semibold text-surface-300 uppercase tracking-wide px-2.5 pb-1">PRO · Facturable</div>
     </div>
   </div>
 
   <div id="file-list" class="flex flex-wrap gap-1.5 mb-2 px-1" hidden></div>
 
   <div class="input-wrapper flex items-end gap-2 bg-surface-400 border border-surface-700 rounded-2xl px-4 py-1 transition-all duration-200 has-[:focus]:border-gold has-[:focus]:shadow-[0_0_0_2px_rgba(200,168,124,0.08)]">
-    <button id="attach-btn" class="w-9 h-9 rounded-xl flex items-center justify-center text-surface-300 hover:text-gold hover:bg-gold/10 shrink-0 transition-all duration-200" aria-label="Adjuntar archivo" title="Adjuntar archivo (txt, código, csv, md…)">
+    <button id="attach-btn" class="w-9 h-9 rounded-xl flex items-center justify-center text-surface-300 hover:text-gold hover:bg-gold/10 shrink-0 transition-all duration-200" aria-label="Adjuntar archivo" title="Adjuntar archivo o imagen">
       <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 5v6M7 8l3 3 3-3M6 14h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 11v4a2 2 0 002 2h8a2 2 0 002-2v-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
-    <input type="file" id="file-input" class="hidden" multiple accept=".txt,.js,.py,.ts,.jsx,.tsx,.css,.scss,.html,.json,.xml,.yaml,.yml,.toml,.md,.csv,.log,.sh,.bash,.env,.gitignore,.dockerfile,.conf,.ini,.cfg,.sql,.rb,.go,.rs,.java,.cpp,.c,.h,.hpp,.php,.swift,.kt,.kts,.scala,.r,.pl,.lua,.vue,.svelte,.astro,.tex,.rst,.org,.ps1,.bat,.cmd,.gradle,.makefile,.prisma,.graphql,.gql,.proto,.svg,.tf,.zig,.nim,.diff,.patch,.properties,.desktop,.service" />
+    <input type="file" id="file-input" class="hidden" multiple accept=".txt,.js,.py,.ts,.jsx,.tsx,.css,.scss,.html,.json,.xml,.yaml,.yml,.toml,.md,.csv,.log,.sh,.bash,.env,.gitignore,.dockerfile,.conf,.ini,.cfg,.sql,.rb,.go,.rs,.java,.cpp,.c,.h,.hpp,.php,.swift,.kt,.kts,.scala,.r,.pl,.lua,.vue,.svelte,.astro,.tex,.rst,.org,.ps1,.bat,.cmd,.gradle,.makefile,.prisma,.graphql,.gql,.proto,.svg,.tf,.zig,.nim,.diff,.patch,.properties,.desktop,.service,.jpg,.jpeg,.png,.gif,.webp,.bmp,.avif" />
     <textarea id="message-input" class="message-input flex-1 py-2 text-[15px] bg-transparent text-surface-100 max-h-[120px] leading-relaxed placeholder:text-surface-300" placeholder="Escribe un mensaje..." rows="1" aria-label="Mensaje"></textarea>
     <button id="send-btn" class="send-btn w-9 h-9 rounded-xl flex items-center justify-center bg-gold text-surface shrink-0 transition-all duration-200 hover:bg-gold-50 hover:scale-105 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100" aria-label="Enviar mensaje" disabled>
       <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M2 10l16-7-7 16-3-6-6-3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>

@@ -93,14 +93,42 @@ export function isProviderConfigured(providerId) {
   return true
 }
 
+function buildParts(msg) {
+  const parts = [{ text: msg.content || '' }]
+  if (msg.images?.length) {
+    for (const img of msg.images) {
+      parts.push({ inlineData: { mimeType: img.mime, data: img.base64 } })
+    }
+  }
+  return parts
+}
+
+function buildContent(msg) {
+  const content = [{ type: 'text', text: msg.content || '' }]
+  if (msg.images?.length) {
+    for (const img of msg.images) {
+      content.push({
+        type: 'image_url',
+        image_url: { url: `data:${img.mime};base64,${img.base64}` },
+      })
+    }
+  }
+  return content
+}
+
 function toApiMessages(messages, providerType) {
   if (providerType === 'gemini') {
     return messages.map((m) => ({
       role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
+      parts: buildParts(m),
     }))
   }
-  return messages.map((m) => ({ role: m.role, content: m.content }))
+  return messages.map((m) => {
+    if (m.images?.length) {
+      return { role: m.role, content: buildContent(m) }
+    }
+    return { role: m.role, content: m.content }
+  })
 }
 
 function extractContent(parsed, providerType) {
@@ -136,12 +164,12 @@ export async function* streamChat(messages, { provider, signal } = {}) {
 
   const systemPrompt = getSystemPrompt(provider)
 
+  const apiMessages = toApiMessages(messages, config.type)
+
   if (!config.apiKey) {
-    yield* streamViaProxy(messages, provider, systemPrompt, signal)
+    yield* streamViaProxy(apiMessages, provider, systemPrompt, signal)
     return
   }
-
-  const apiMessages = toApiMessages(messages, config.type)
 
   if (config.type === 'gemini') {
     yield* streamGemini(apiMessages, config, systemPrompt, signal)
