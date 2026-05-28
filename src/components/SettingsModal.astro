@@ -1,19 +1,19 @@
 ---
+
 ---
 
-<div id="settings-modal" class="modal-overlay fixed inset-0 z-[200] flex items-center justify-center p-6 animate-fade-in hidden" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
+<div id="settings-modal" class="modal-overlay fixed inset-0 z-[200] flex items-center justify-center p-4 animate-fade-in hidden" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
   <div class="modal-backdrop absolute inset-0 bg-black/65 backdrop-blur-md"></div>
-  <div class="modal-card-wide relative bg-surface-400 border border-surface-700 rounded-2xl px-6 pt-5 pb-5 max-w-[460px] w-full shadow-[0_16px_48px_rgba(0,0,0,0.8)] animate-modal-in">
-    <div class="flex items-center justify-between mb-5">
+  <div class="modal-card-wide relative bg-surface-400 border border-surface-700 rounded-2xl px-6 pt-5 pb-5 max-w-[500px] w-full shadow-[0_16px_48px_rgba(0,0,0,0.8)] animate-modal-in max-h-[90vh] flex flex-col">
+    <div class="flex items-center justify-between mb-5 shrink-0">
       <h3 id="settings-modal-title" class="text-lg font-bold tracking-tight">Configuración</h3>
-      <button id="settings-close" class="w-9 h-9 rounded-[10px] flex items-center justify-center text-surface-200 hover:bg-gold/10 hover:text-gold transition-all duration-200" aria-label="Cerrar">
+      <button id="settings-close" class="w-9 h-9 rounded-[10px] flex items-center justify-center text-surface-200 hover:bg-gold/10 hover:text-gold transition-all duration-200 active:scale-95" aria-label="Cerrar">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5l-10 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       </button>
     </div>
-    <div class="max-h-[65vh] overflow-y-auto space-y-5 pr-1">
-
+    <div class="overflow-y-auto space-y-5 pr-1 settings-scroll">
       <!-- Provider info -->
-      <div>
+      <div class="settings-section">
         <h4 class="text-sm font-semibold mb-2 flex items-center gap-2">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.2"/><path d="M8 4v4l2.5 1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
           Proveedor activo
@@ -23,8 +23,25 @@
         </div>
       </div>
 
+      <!-- Thinking mode -->
+      <div class="settings-section">
+        <h4 class="text-sm font-semibold mb-2 flex items-center gap-2">
+          <svg width="16" height="16" viewBox="0 0 14 14" fill="none"><path d="M7 1v1M7 12v1M1 7h1M12 7h1M2.5 2.5l.7.7M10.8 10.8l.7.7M2.5 11.5l.7-.7M10.8 3.2l.7-.7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="7" cy="7" r="2.5" stroke="currentColor" stroke-width="1.2"/></svg>
+          Modo pensamiento
+        </h4>
+        <p class="text-xs text-surface-300 mb-3 leading-relaxed">Cuando está activo, el modelo razona internamente antes de responder. Mejora la precisión en tareas complejas.</p>
+        <div class="flex items-center gap-3">
+          <label class="thinking-switch" id="settings-thinking-wrap">
+            <div class="thinking-track" id="settings-thinking-track">
+              <span class="thinking-thumb"></span>
+            </div>
+          </label>
+          <span class="text-xs text-surface-300" id="settings-thinking-label">Activado</span>
+        </div>
+      </div>
+
       <!-- API Keys -->
-      <div>
+      <div class="settings-section">
         <h4 class="text-sm font-semibold mb-2 flex items-center gap-2">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 10a2 2 0 100-4 2 2 0 000 4z" stroke="currentColor" stroke-width="1.2"/><path d="M13 8a5 5 0 10-9.9 1.5L2 11v2h2l1-1 1 1h2l1.5-1.5A5 5 0 0013 8z" stroke="currentColor" stroke-width="1.2"/></svg>
           API Keys
@@ -32,30 +49,32 @@
         <p class="text-xs text-surface-300 mb-3 leading-relaxed">Configura tus claves. Se almacenan solo en tu navegador.</p>
         <div class="mb-3">
           <label for="settings-openrouter" class="block text-xs font-medium text-surface-200 mb-1">OpenRouter</label>
-          <input type="password" id="settings-openrouter" class="settings-input w-full px-3.5 py-2.5 rounded-xl bg-surface-500 border border-surface-700 text-sm text-surface-100 placeholder:text-surface-300 transition-colors duration-200 focus:border-gold focus:shadow-[0_0_0_2px_rgba(200,168,124,0.08)] focus:outline-none" placeholder="sk-or-..." />
+          <div class="relative">
+            <input type="password" id="settings-openrouter" class="settings-input w-full px-3.5 py-2.5 rounded-xl bg-surface-500 border border-surface-700 text-sm text-surface-100 placeholder:text-surface-300 pr-10" placeholder="sk-or-..." />
+          </div>
         </div>
         <div class="mb-3">
           <label for="settings-gemini" class="block text-xs font-medium text-surface-200 mb-1">Gemini</label>
-          <input type="password" id="settings-gemini" class="settings-input w-full px-3.5 py-2.5 rounded-xl bg-surface-500 border border-surface-700 text-sm text-surface-100 placeholder:text-surface-300 transition-colors duration-200 focus:border-gold focus:shadow-[0_0_0_2px_rgba(200,168,124,0.08)] focus:outline-none" placeholder="AIza..." />
+          <input type="password" id="settings-gemini" class="settings-input w-full px-3.5 py-2.5 rounded-xl bg-surface-500 border border-surface-700 text-sm text-surface-100 placeholder:text-surface-300" placeholder="AIza..." />
         </div>
         <div class="mb-3">
           <label for="settings-pro" class="block text-xs font-medium text-surface-200 mb-1">DeepSeek (PRO)</label>
-          <input type="password" id="settings-pro" class="settings-input w-full px-3.5 py-2.5 rounded-xl bg-surface-500 border border-surface-700 text-sm text-surface-100 placeholder:text-surface-300 transition-colors duration-200 focus:border-gold focus:shadow-[0_0_0_2px_rgba(200,168,124,0.08)] focus:outline-none" placeholder="sk-..." />
+          <input type="password" id="settings-pro" class="settings-input w-full px-3.5 py-2.5 rounded-xl bg-surface-500 border border-surface-700 text-sm text-surface-100 placeholder:text-surface-300" placeholder="sk-..." />
         </div>
       </div>
 
       <!-- Theme -->
-      <div>
+      <div class="settings-section">
         <h4 class="text-sm font-semibold mb-2 flex items-center gap-2">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.2"/><path d="M8 1v1M8 14v1M1 8h1M14 8h1M3.05 3.05l.7.7M12.25 12.25l.7.7M3.05 12.95l.7-.7M12.25 3.75l.7-.7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
           Tema
         </h4>
         <div class="flex gap-2">
-          <button id="settings-theme-dark" class="theme-option flex-1 flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-sm font-medium border transition-all duration-200 bg-surface-500 border-surface-700 text-surface-200 hover:bg-gold/10 hover:border-gold/30" data-theme-option="dark">
+          <button id="settings-theme-dark" class="theme-option flex-1 flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-sm font-medium border transition-all duration-200 bg-surface-500 border-surface-700 text-surface-200 hover:bg-gold/10 hover:border-gold/30 active:scale-[0.98]" data-theme-option="dark">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M13.5 10.5A6 6 0 015.5 2.5 6 6 0 1013.5 10.5z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
             Oscuro
           </button>
-          <button id="settings-theme-light" class="theme-option flex-1 flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-sm font-medium border transition-all duration-200 bg-surface-500 border-surface-700 text-surface-200 hover:bg-gold/10 hover:border-gold/30" data-theme-option="light">
+          <button id="settings-theme-light" class="theme-option flex-1 flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-sm font-medium border transition-all duration-200 bg-surface-500 border-surface-700 text-surface-200 hover:bg-gold/10 hover:border-gold/30 active:scale-[0.98]" data-theme-option="light">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.2"/><path d="M8 1v1M8 14v1M1 8h1M14 8h1M3.05 3.05l.7.7M12.25 12.25l.7.7M3.05 12.95l.7-.7M12.25 3.75l.7-.7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
             Claro
           </button>
@@ -63,7 +82,7 @@
       </div>
 
       <!-- Keyboard shortcuts -->
-      <div>
+      <div class="settings-section">
         <h4 class="text-sm font-semibold mb-2 flex items-center gap-2">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="3.5" width="13" height="9" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M4.5 10h7M4.5 7h0M7 7h0M9.5 7h0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
           Atajos de teclado
@@ -79,17 +98,16 @@
       </div>
 
       <!-- About -->
-      <div>
+      <div class="settings-section">
         <h4 class="text-sm font-semibold mb-1 flex items-center gap-2">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.2"/><path d="M8 7v4M8 5h0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           Acerca de
         </h4>
         <p class="text-xs text-surface-300 leading-relaxed">KalaChat v2.0 · Los mensajes se procesan localmente. Las claves API se almacenan solo en tu navegador. Soporta imágenes con modelos compatibles.</p>
       </div>
-
     </div>
-    <div class="flex gap-2 justify-end mt-5 pt-4 border-t border-surface-700">
-      <button id="settings-save" class="px-5 py-2.5 rounded-xl text-sm font-semibold bg-gold text-surface hover:bg-gold-50 transition-all duration-200">Guardar</button>
+    <div class="flex gap-2 justify-end mt-5 pt-4 border-t border-surface-700 shrink-0">
+      <button id="settings-save" class="px-5 py-2.5 rounded-xl text-sm font-semibold bg-gold text-surface hover:bg-gold-50 transition-all duration-200 active:scale-[0.98]">Guardar</button>
     </div>
   </div>
 </div>

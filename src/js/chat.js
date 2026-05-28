@@ -76,11 +76,8 @@ function setupReasoningToggle(container) {
   container.addEventListener('click', (e) => {
     const toggle = e.target.closest('.reasoning-toggle')
     if (!toggle) return
-    const content = toggle.parentElement?.querySelector('.reasoning-content')
-    if (!content) return
     const expanded = toggle.getAttribute('aria-expanded') === 'true'
     toggle.setAttribute('aria-expanded', !expanded)
-    content.hidden = expanded
   })
 }
 

@@ -1,4 +1,5 @@
 ---
+
 ---
 
 <div id="messages-container" class="flex-1 overflow-y-auto overflow-x-hidden flex flex-col scroll-smooth relative">
@@ -21,13 +22,16 @@
     <h2 class="font-display text-3xl font-normal text-surface-100 mb-2.5 tracking-tight opacity-0 lg:text-[34px]" style="animation:fadeIn .6s ease .2s forwards">¿En qué puedo ayudarte?</h2>
     <p class="text-sm text-surface-200 mb-8 leading-relaxed opacity-0" style="animation:fadeIn .6s ease .3s forwards">Pregúntame lo que sea, estoy aquí para ti</p>
     <div class="flex flex-wrap justify-center gap-2 max-w-[380px]">
-      <button class="suggestion-chip px-4 py-2 rounded-full text-sm text-surface-200 border border-surface-700 bg-surface-400/50 hover:bg-gold/10 hover:border-gold hover:text-gold transition-all duration-250 whitespace-nowrap opacity-0" style="animation:fadeIn .5s ease .4s forwards" data-prompt="Explica un concepto complejo de forma sencilla">Explica algo complejo</button>
-      <button class="suggestion-chip px-4 py-2 rounded-full text-sm text-surface-200 border border-surface-700 bg-surface-400/50 hover:bg-gold/10 hover:border-gold hover:text-gold transition-all duration-250 whitespace-nowrap opacity-0" style="animation:fadeIn .5s ease .5s forwards" data-prompt="Ayúdame a escribir un correo profesional">Redacta un correo</button>
-      <button class="suggestion-chip px-4 py-2 rounded-full text-sm text-surface-200 border border-surface-700 bg-surface-400/50 hover:bg-gold/10 hover:border-gold hover:text-gold transition-all duration-250 whitespace-nowrap opacity-0" style="animation:fadeIn .5s ease .6s forwards" data-prompt="Traduce este texto al inglés">Traduce un texto</button>
-      <button class="suggestion-chip px-4 py-2 rounded-full text-sm text-surface-200 border border-surface-700 bg-surface-400/50 hover:bg-gold/10 hover:border-gold hover:text-gold transition-all duration-250 whitespace-nowrap opacity-0" style="animation:fadeIn .5s ease .7s forwards" data-prompt="Dame ideas creativas para un proyecto">Ideas creativas</button>
+      <button class="suggestion-chip px-4 py-2.5 rounded-full text-sm text-surface-200 border border-surface-700 bg-surface-400/50 hover:bg-gold/10 hover:border-gold hover:text-gold transition-all duration-250 whitespace-nowrap opacity-0" style="animation:fadeIn .5s ease .4s forwards" data-prompt="Explica un concepto complejo de forma sencilla">Explica algo complejo</button>
+      <button class="suggestion-chip px-4 py-2.5 rounded-full text-sm text-surface-200 border border-surface-700 bg-surface-400/50 hover:bg-gold/10 hover:border-gold hover:text-gold transition-all duration-250 whitespace-nowrap opacity-0" style="animation:fadeIn .5s ease .5s forwards" data-prompt="Ayúdame a escribir un correo profesional">Redacta un correo</button>
+      <button class="suggestion-chip px-4 py-2.5 rounded-full text-sm text-surface-200 border border-surface-700 bg-surface-400/50 hover:bg-gold/10 hover:border-gold hover:text-gold transition-all duration-250 whitespace-nowrap opacity-0" style="animation:fadeIn .5s ease .6s forwards" data-prompt="Traduce este texto al inglés">Traduce un texto</button>
+      <button class="suggestion-chip px-4 py-2.5 rounded-full text-sm text-surface-200 border border-surface-700 bg-surface-400/50 hover:bg-gold/10 hover:border-gold hover:text-gold transition-all duration-250 whitespace-nowrap opacity-0" style="animation:fadeIn .5s ease .7s forwards" data-prompt="Dame ideas creativas para un proyecto">Ideas creativas</button>
     </div>
   </div>
 
   <div id="messages-list" class="flex flex-col gap-1.5 px-3 pb-2 pt-4 min-h-full justify-end lg:px-6 lg:pb-4 lg:pt-6"></div>
   <div id="scroll-anchor" class="h-px shrink-0"></div>
+  <button id="scroll-bottom-btn" class="scroll-bottom-btn" aria-label="Ir al final">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 6l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
 </div>

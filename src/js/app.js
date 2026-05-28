@@ -29,7 +29,9 @@ function cacheElements() {
     'settings-modal', 'settings-close', 'settings-save',
     'settings-openrouter', 'settings-gemini', 'settings-pro',
     'file-input', 'attach-btn', 'file-list', 'settings-provider-info',
-    'thinking-btn',
+    'thinking-track', 'thinking-label-text', 'thinking-label-wrap',
+    'settings-thinking-track', 'settings-thinking-wrap', 'settings-thinking-label',
+    'scroll-bottom-btn', 'theme-color-meta',
   ]
   ids.forEach(id => { el[id] = $(`#${id}`) })
   el.modeBtns = $$('.mode-btn')
@@ -74,8 +76,15 @@ function saveState() {
 function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme)
   state.theme = theme
+  updateThemeColorMeta()
   saveState()
   updateSettingsProviderInfo()
+}
+
+function updateThemeColorMeta() {
+  const meta = el['theme-color-meta']
+  if (!meta) return
+  meta.content = state.theme === 'dark' ? '#0C0C0E' : '#F5F5F0'
 }
 
 function toggleSidebar() { document.body.classList.toggle('sidebar-open') }
@@ -362,6 +371,7 @@ async function sendMessage() {
 
   state.sending = true
   el['send-btn'].disabled = true
+  el['send-btn'].classList.add('sending')
   el['message-input'].disabled = true
   if (el['empty-state']) el['empty-state'].style.display = 'none'
 
@@ -481,6 +491,7 @@ async function sendMessage() {
   } finally {
     state.sending = false
     el['send-btn'].disabled = false
+    el['send-btn'].classList.remove('sending')
     el['message-input'].disabled = false
     el['message-input'].focus()
     abortController = null
@@ -613,6 +624,52 @@ function initProviders() {
   }
 }
 
+function updateThinkingSwitch() {
+  const isActive = state.thinking
+  const tracks = [el['thinking-track'], el['settings-thinking-track']]
+  tracks.forEach(track => {
+    if (!track) return
+    track.classList.toggle('active', isActive)
+  })
+
+  const labels = [el['thinking-label-text'], el['settings-thinking-label']]
+  labels.forEach(label => {
+    if (!label) return
+    label.textContent = isActive ? 'Thinking' : 'No thinking'
+    label.classList.toggle('active', isActive)
+  })
+}
+
+function bindThinkingSwitch(trackEl) {
+  if (!trackEl) return
+  trackEl.addEventListener('click', (e) => {
+    e.stopPropagation()
+    state.thinking = !state.thinking
+    updateThinkingSwitch()
+    saveState()
+  })
+}
+
+function setupScrollBottomBtn() {
+  const container = el['messages-container']
+  const btn = el['scroll-bottom-btn']
+  if (!container || !btn) return
+
+  let ticking = false
+  container.addEventListener('scroll', () => {
+    if (!ticking) {
+      requestAnimationFrame(() => {
+        const threshold = container.scrollHeight - container.clientHeight - 300
+        btn.classList.toggle('visible', container.scrollTop < threshold)
+        ticking = false
+      })
+      ticking = true
+    }
+  })
+
+  btn.addEventListener('click', scrollToBottom)
+}
+
 export function bootstrap() {
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => setTimeout(start, 0))
@@ -628,7 +685,7 @@ async function start() {
 
   setupMessageInteractions(el['messages-list'])
 
-  // --- Provider dropdown (fixed positioning to avoid overflow: hidden) ---
+  // --- Provider dropdown (fixed positioning) ---
   if (el['provider-selector']) {
     el['provider-selector'].addEventListener('click', e => {
       e.stopPropagation()
@@ -653,6 +710,7 @@ async function start() {
   if (el['theme-btn']) {
     el['theme-btn'].addEventListener('click', () => {
       applyTheme(state.theme === 'dark' ? 'light' : 'dark')
+      updateSettingsThemeBtns()
     })
   }
 
@@ -727,26 +785,10 @@ async function start() {
   })
   updateSettingsThemeBtns()
 
-  // --- Thinking toggle ---
-  function updateThinkingBtn() {
-    if (!el['thinking-btn']) return
-    const isActive = state.thinking
-    el['thinking-btn'].setAttribute('data-active', isActive ? '' : null)
-    el['thinking-btn'].className = `flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-medium border transition-all duration-200 ${
-      isActive
-        ? 'bg-gold/10 border-gold text-gold'
-        : 'bg-surface-400 border-surface-700 text-surface-300 hover:bg-gold/10 hover:text-gold hover:border-gold/30'
-    }`
-    if (el['thinking-label']) el['thinking-label'].textContent = isActive ? 'Thinking' : 'No thinking'
-  }
-  if (el['thinking-btn']) {
-    el['thinking-btn'].addEventListener('click', () => {
-      state.thinking = !state.thinking
-      updateThinkingBtn()
-      saveState()
-    })
-  }
-  updateThinkingBtn()
+  // --- Thinking toggle (iOS switch) ---
+  updateThinkingSwitch()
+  bindThinkingSwitch(el['thinking-track'])
+  bindThinkingSwitch(el['settings-thinking-track'])
 
   // --- Modal backdrop clicks ---
   $$('.modal-overlay').forEach(modal => {
@@ -836,6 +878,9 @@ async function start() {
       }
     })
   }
+
+  // --- Scroll to bottom button ---
+  setupScrollBottomBtn()
 
   // --- Load settings overrides ---
   try {
