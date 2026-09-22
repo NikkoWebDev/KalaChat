@@ -1,7 +1,7 @@
 import { dialogar, getModelo, setSettingsOverrides } from './api.js'
 import {
   initRenderer, crearMensaje, crearMensajeStreaming, pintarTexto, pintarFuentes,
-  pintarRazonamiento, escribirEscribiendo, formatoFecha, markdown,
+  pintarRazonamiento, pintarEstado, escribirEscribiendo, formatoFecha, markdown,
 } from './chat.js'
 import { escapeHtml, copiar, descargar, slug, cercaDelFondo, alFondo, textoDeMensaje } from './utils.js'
 import { STORAGE_KEYS, DEFAULTS, UI, IDENTIDAD, SUGERENCIAS, MODELOS } from './constants.js'
@@ -336,6 +336,8 @@ async function generar(conv) {
       if (evento.tipo === 'fuentes') {
         fuentes = evento.fuentes
         pintarFuentes(fila, fuentes)
+      } else if (evento.tipo === 'estado') {
+        pintarEstado(fila, evento.texto)
       } else if (evento.tipo === 'razonamiento') {
         razonamiento += evento.texto
         pintarRazonamiento(fila, razonamiento)
@@ -350,8 +352,12 @@ async function generar(conv) {
       acumulado = acumulado || ''
     } else {
       console.error(err)
-      acumulado += acumulado ? `\n\n**Error:** ${err.message}` : `**No se pudo obtener respuesta.** ${err.message}`
-      mostrarAviso(err.message)
+      const sinRed = typeof navigator !== 'undefined' && navigator.onLine === false
+      const detalle = sinRed
+        ? 'Sin conexión a internet. Revisa tu red e inténtalo de nuevo.'
+        : err.message
+      acumulado += acumulado ? `\n\n**Error:** ${detalle}` : `**No se pudo obtener respuesta.** ${detalle}`
+      mostrarAviso(detalle)
     }
   } finally {
     generando = false

@@ -75,12 +75,26 @@ function esperar(ms) {
   return new Promise(r => setTimeout(r, ms))
 }
 
+/** Falla de red a nivel fetch (típico: Render despertando, corte de red, bloqueador). */
+function esFalloRed(err) {
+  if (err?.name === 'TypeError') return true
+  return /networkerror|failed to fetch|fetch failed|load failed|network request failed|offline/i.test(err?.message || '')
+}
+
+function sinConexion() {
+  return typeof navigator !== 'undefined' && navigator.onLine === false
+}
+
 /* ==========================================================================
    Reprebot · /v1/chat/completions
    SSE propio: {type:"sources"} → {type:"delta"} → {type:"done"}
    ========================================================================== */
 
 async function* dialogarReprebot(mensajes, { signal, k }) {
+  if (sinConexion()) {
+    throw new Error('Sin conexión a internet. Revisa tu red e inténtalo de nuevo.')
+  }
+
   const url = `${REPREBOT_BASE_URL}/v1/chat/completions`
   const headers = { 'Content-Type': 'application/json' }
   const apiKey = getApiKey('reprebot')
@@ -90,13 +104,44 @@ async function* dialogarReprebot(mensajes, { signal, k }) {
   const cuerpoK = Number(k)
   if (Number.isFinite(cuerpoK)) body.k = Math.min(20, Math.max(1, Math.trunc(cuerpoK)))
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-    signal,
-    mode: 'cors',
-  })
+  // Render duerme el servicio en inactividad: el primer intento puede fallar
+  // a nivel red o con 502/503/504 mientras despierta. Se reintenta avisando.
+  const ESPERAS = [3000, 10000]
+  let res = null
+
+  for (let intento = 0; ; intento++) {
+    if (intento > 0) {
+      yield { tipo: 'estado', texto: `El servidor está despertando… (intento ${intento + 1})` }
+    }
+
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        signal,
+        mode: 'cors',
+      })
+    } catch (err) {
+      if (signal?.aborted) throw err
+      if (sinConexion()) {
+        throw new Error('Sin conexión a internet. Revisa tu red e inténtalo de nuevo.')
+      }
+      if (intento < ESPERAS.length && esFalloRed(err)) {
+        await esperar(ESPERAS[intento])
+        continue
+      }
+      throw new Error('No se pudo contactar el servidor de Reprebot. Reintenta en un minuto.')
+    }
+
+    if ([502, 503, 504].includes(res.status)) {
+      if (intento < ESPERAS.length && !signal?.aborted) {
+        await esperar(ESPERAS[intento])
+        continue
+      }
+    }
+    break
+  }
 
   if (!res.ok) {
     const detalle = await res.text().catch(() => '')
@@ -222,33 +267,33 @@ async function* dialogarOpenAI(mensajes, cfg, { signal }) {
    ========================================================================== */
 
 /**
- * Un turno de conversacion. Emite {tipo:'razonamiento'|'texto'|'fuentes'}.
- * Reintenta una vez en el arranque en frio de Render (502/503/504).
+ * Un turno de conversacion. Emite {tipo:'estado'|'razonamiento'|'texto'|'fuentes'}.
+ * El reintento ante el arranque en frio de Render vive dentro de dialogarReprebot.
  */
 export async function* dialogar(mensajes, { modelo = 'reprebot', signal, k } = {}) {
   const cfg = modeloConfig(modelo)
   if (!cfg) throw new Error(`Modelo "${modelo}" desconocido`)
 
   if (cfg.tipo === 'reprebot') {
-    for (let intento = 0; ; intento++) {
-      try {
-        yield* dialogarReprebot(mensajes, { signal, k })
-        return
-      } catch (err) {
-        const esArranque = /50[234]/.test(err.message)
-        if (intento === 0 && esArranque && !signal?.aborted) {
-          await esperar(2500)
-          continue
-        }
-        throw err
-      }
-    }
+    yield* dialogarReprebot(mensajes, { signal, k })
+    return
   }
 
+  if (sinConexion()) {
+    throw new Error('Sin conexión a internet. Revisa tu red e inténtalo de nuevo.')
+  }
   if (!cfg.apiKey) throw new Error(`Configura la clave de ${cfg.label} en Ajustes`)
   const messages = [
     { role: 'system', content: SYSTEM_PROMPTS[cfg.id] || SYSTEM_PROMPTS.reprebot },
     ...mensajes.map(m => ({ role: m.role, content: m.content || '' })),
   ]
-  yield* dialogarOpenAI(messages, cfg, { signal })
+  try {
+    yield* dialogarOpenAI(messages, cfg, { signal })
+  } catch (err) {
+    if (signal?.aborted) throw err
+    if (esFalloRed(err)) {
+      throw new Error('No se pudo contactar Groq. Revisa tu conexión o reintenta en un minuto.')
+    }
+    throw err
+  }
 }

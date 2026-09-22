@@ -231,6 +231,13 @@ export function escribirEscribiendo(fila, activo) {
     : ''
 }
 
+/** Aviso transitorio (p. ej. servidor despertando). Se borra al llegar texto. */
+export function pintarEstado(fila, texto) {
+  const zona = fila.querySelector('[data-zona-texto]')
+  if (!zona) return
+  zona.innerHTML = `<span class="estado-conexion">${escapeHtml(texto)}</span><span class="escribiendo"><span class="punto"></span><span class="punto"></span><span class="punto"></span></span>`
+}
+
 export async function pintarTexto(fila, texto, enCurso) {
   const zona = fila.querySelector('[data-zona-texto]')
   if (!zona) return

@@ -80,6 +80,19 @@ mvp/index.html                 # prototipo antiguo (sin claves reales)
 `Enter` enviar · `Shift+Enter` nueva línea · `Ctrl+Shift+O` nueva conversación ·
 `Ctrl+K` buscar · `/` enfocar compositor · `Esc` detener generación.
 
+## Si falla con error de red
+
+El backend RAG vive en Render (plan gratuito): tras un rato sin uso se duerme y el
+primer intento puede fallar con `NetworkError`. El chat lo detecta solo:
+
+- reintenta hasta 2 veces (3 s y 10 s) mostrando _"El servidor está despertando…"_
+  en la burbuja;
+- si no hay internet (`navigator.onLine`), lo dice directamente en vez de reintentar;
+- si todo falla, el mensaje explica la causa en lugar del `TypeError` crudo del navegador.
+
+Causas típicas si persiste: sin internet, VPN/DNS, o un bloqueador (adblock) cortando
+`reprebot-api.onrender.com`. Groq tiene el mismo trato ante cortes de red.
+
 ## Historial de cambios de este trabajo
 
 1. **Reparación del chat** — el selector de modelo no abría (`el.selectorModelo`
