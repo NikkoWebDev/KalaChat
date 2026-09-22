@@ -17,6 +17,12 @@ export const DEFAULTS = {
   k: 5,
 }
 
+export const API_DEFAULTS = {
+  temperature: 0.2,
+  maxTokens: 2048,
+  timeoutMs: 60_000,
+}
+
 export const UI = {
   toastDuration: 2600,
   maxStoredMessages: 120,
@@ -49,6 +55,10 @@ Escribes en espanol, en segunda persona formal, con precision y sin relleno. Res
 
 export const SYSTEM_PROMPTS = {
   reprebot: REPREBOT_CORE,
+
+  groq: `${REPREBOT_CORE}
+
+Nota de modo: estas corriendo como modelo de proposito general dentro de Reprebot. Si la pregunta no es sobre la UNAL, respondes con tu conocimiento general y lo adviertes.`,
 }
 
 const env = import.meta.env
@@ -60,12 +70,23 @@ export const MODELOS = {
     tipo: 'reprebot',
     grupo: 'reprebot',
     modo: 'free',
-    sello: 'Documental',
+    sello: 'Kala AI 4.3',
+  },
+  groq: {
+    label: 'Groq GPT-OSS 120B',
+    descripcion: 'Proposito general, respuesta rapida',
+    tipo: 'openai',
+    grupo: 'groq',
+    baseUrl: env.VITE_GROQ_BASE_URL || 'https://api.groq.com/openai/v1',
+    modelo: env.VITE_GROQ_MODEL || 'openai/gpt-oss-120b',
+    modo: 'free',
+    sello: 'General',
   },
 }
 
 export const API_KEYS_ENV = {
   reprebot: env.VITE_REPREBOT_API_KEY || '',
+  groq: env.VITE_GROQ_API_KEY || '',
 }
 
 export const REPREBOT_BASE_URL = (env.VITE_REPREBOT_BASE_URL || 'https://reprebot-api.onrender.com').replace(/\/+$/, '')

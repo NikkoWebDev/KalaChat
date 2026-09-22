@@ -192,15 +192,48 @@ function mostrarAviso(texto) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Modelo unico: Kala AI 4.3                                             */
+/* Selector de modelo (Kala AI 4.3 + Groq)                               */
 /* ------------------------------------------------------------------ */
+
+function pintarMenuModelos() {
+  const cont = el.menuModelos
+  if (!cont) return
+
+  const grupos = [
+    { titulo: 'Documental', ids: ['reprebot'] },
+    { titulo: 'General', ids: ['groq'] },
+  ]
+
+  cont.innerHTML = grupos.map(g => {
+    const items = g.ids.filter(id => MODELOS[id]).map(id => {
+      const m = MODELOS[id]
+      return `<button class="modelo-item" type="button" role="option" data-modelo="${escapeHtml(id)}" aria-selected="${id === estado.modelo}">
+        <span class="min-w-0 flex-1">
+          <span class="modelo-nombre block">${escapeHtml(m.label)}</span>
+          <span class="modelo-desc block">${escapeHtml(m.descripcion)}</span>
+        </span>
+        ${m.sello ? `<span class="sello-gratis">${escapeHtml(m.sello)}</span>` : ''}
+      </button>`
+    }).join('')
+    return `<div class="px-1 pb-1.5 pt-2 text-[10px] font-bold uppercase tracking-wider" style="color:var(--fg-suave)">${g.titulo}</div>${items}`
+  }).join('')
+}
+
+function elegirModelo(id) {
+  if (!MODELOS[id]) return
+  estado.modelo = id
+  if (convActual) convActual.modelo = id
+  guardarEstado()
+  pintarEtiquetaModelo()
+  pintarMenuModelos()
+}
 
 function pintarEtiquetaModelo() {
   const m = getModelo(estado.modelo)
   if (el.modeloLabel) el.modeloLabel.textContent = m?.label || IDENTIDAD.nombre
   if (el.modeloSello) {
-    el.modeloSello.textContent = m?.sello || 'Documental'
-    el.modeloSello.className = m?.modo === 'pro' ? 'sello-pro' : 'sello-gratis'
+    el.modeloSello.textContent = m?.sello || 'Kala AI 4.3'
+    el.modeloSello.className = `hidden shrink-0 sm:inline ${m?.modo === 'pro' ? 'sello-pro' : 'sello-gratis'}`
   }
 }
 
@@ -479,8 +512,26 @@ function exportar(formato) {
 /* ------------------------------------------------------------------ */
 
 function cerrarMenu() {
+  el.menuModelos?.classList.add('hidden')
+  el.modeloBtn?.setAttribute('aria-expanded', 'false')
   el.velo?.classList.add('hidden')
   document.body.classList.remove('sidebar-open')
+}
+
+function alternarMenuModelos() {
+  const menu = el.menuModelos
+  if (!menu || !el.modeloBtn) return
+  const abierto = !menu.classList.contains('hidden')
+  if (abierto) {
+    menu.classList.add('hidden')
+    el.modeloBtn.setAttribute('aria-expanded', 'false')
+    return
+  }
+  const rect = el.modeloBtn.getBoundingClientRect()
+  menu.style.left = `${Math.max(8, rect.left)}px`
+  menu.style.bottom = `${window.innerHeight - rect.top + 6}px`
+  menu.classList.remove('hidden')
+  el.modeloBtn.setAttribute('aria-expanded', 'true')
 }
 
 function abrirFuente(bloque, abrir) {
@@ -599,11 +650,11 @@ function cachear() {
   const ids = [
     'sidebar', 'velo', 'menu-btn', 'contenedor', 'mensajes', 'vacio',
     'input', 'enviar', 'adjuntar', 'archivos', 'chips', 'lista', 'buscar',
-    'modelo-label', 'modelo-sello',
+    'modelo-btn', 'modelo-label', 'modelo-sello', 'menu-modelos',
     'modal-ajustes', 'btn-ajustes', 'cerrar-ajustes',
     'info-modelo',
     'nueva-conv', 'ir-abajo', 'exportar-md', 'exportar-json',
-    'clave-reprebot',
+    'clave-reprebot', 'clave-groq',
     'guardar-ajustes', 'k-fuentes', 'k-valor', 'limpiar-datos', 'sugerencias',
     'cerrar-sidebar',
   ]
@@ -632,7 +683,6 @@ async function arrancar() {
   await initRenderer()
 
   aplicarTema(estado.theme)
-  pintarSwitchThinking()
   pintarMenuModelos()
   pintarEtiquetaModelo()
   pintarLista()
@@ -695,6 +745,7 @@ async function arrancar() {
     if (!btn) return
     elegirModelo(btn.dataset.modelo)
     el.menuModelos.classList.add('hidden')
+    el.modeloBtn?.setAttribute('aria-expanded', 'false')
   })
 
   document.addEventListener('click', ev => {
@@ -703,10 +754,6 @@ async function arrancar() {
       el.modeloBtn?.setAttribute('aria-expanded', 'false')
     }
   })
-
-  // --- thinking ---
-  el.thinkingTrack?.addEventListener('click', alternarThinking)
-  el.ajustesThinkingTrack?.addEventListener('click', alternarThinking)
 
   // --- sidebar ---
   el.menuBtn?.addEventListener('click', () => {
@@ -741,9 +788,7 @@ async function arrancar() {
     cerrarMenu()
     const ajustes = leerAjustes()
     el.claveReprebot.value = ajustes.reprebot?.apiKey || ''
-    el.claveOpenrouter.value = ajustes.openrouter?.apiKey || ''
-    el.claveGemini.value = ajustes.gemini?.apiKey || ''
-    el.clavePro.value = ajustes.pro?.apiKey || ''
+    el.claveGroq.value = ajustes.groq?.apiKey || ''
     el.kFuentes.value = estado.k
     el.kValor.textContent = estado.k
     pintarInfoModelo()
@@ -761,9 +806,7 @@ async function arrancar() {
   el.guardarAjustes?.addEventListener('click', () => {
     const payload = {
       reprebot: { apiKey: el.claveReprebot.value.trim() },
-      openrouter: { apiKey: el.claveOpenrouter.value.trim() },
-      gemini: { apiKey: el.claveGemini.value.trim() },
-      pro: { apiKey: el.clavePro.value.trim() },
+      groq: { apiKey: el.claveGroq.value.trim() },
     }
     setSettingsOverrides(payload)
     guardarAjustes(payload)

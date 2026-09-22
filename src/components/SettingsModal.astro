@@ -32,20 +32,6 @@
       </section>
 
       <section style="border-left:2px solid var(--linea);padding-left:14px">
-        <h4 class="mb-2 text-[13px] font-semibold">Razonamiento</h4>
-        <p class="mb-3 text-[12px] leading-relaxed" style="color:var(--fg-suave)">
-          Con el modo activo el modelo piensa antes de contestar. Aplica a los modelos de propósito general,
-          no a Reprebot.
-        </p>
-        <label class="switch">
-          <span id="ajustes-thinking-track" class="switch-track" data-on="true" role="switch" tabindex="0" aria-label="Modo razonamiento">
-            <span class="switch-thumb"></span>
-          </span>
-          <span id="ajustes-thinking-label" class="switch-label" data-on="true">Razonamiento</span>
-        </label>
-      </section>
-
-      <section style="border-left:2px solid var(--linea);padding-left:14px">
         <h4 class="mb-2 text-[13px] font-semibold">Tema</h4>
         <div class="flex gap-2">
           <button type="button" data-tema="dark" class="opcion-tema flex flex-1 items-center gap-2 rounded-xl border px-3.5 py-2.5 text-[13px] font-medium transition-colors" style="border-color:var(--linea)">
@@ -69,16 +55,8 @@
         <input id="clave-reprebot" type="password" autocomplete="off" placeholder="opcional"
           class="mb-3 w-full rounded-xl border border-[color:var(--linea)] bg-transparent px-3.5 py-2.5 text-[13px] outline-none placeholder:text-[color:var(--fg-suave)] focus:border-[color:var(--acento)]" />
 
-        <label for="clave-openrouter" class="mb-1 block text-[12px] font-medium">OpenRouter</label>
-        <input id="clave-openrouter" type="password" autocomplete="off" placeholder="sk-or-…"
-          class="mb-3 w-full rounded-xl border border-[color:var(--linea)] bg-transparent px-3.5 py-2.5 text-[13px] outline-none placeholder:text-[color:var(--fg-suave)] focus:border-[color:var(--acento)]" />
-
-        <label for="clave-gemini" class="mb-1 block text-[12px] font-medium">Gemini</label>
-        <input id="clave-gemini" type="password" autocomplete="off" placeholder="AIza…"
-          class="mb-3 w-full rounded-xl border border-[color:var(--linea)] bg-transparent px-3.5 py-2.5 text-[13px] outline-none placeholder:text-[color:var(--fg-suave)] focus:border-[color:var(--acento)]" />
-
-        <label for="clave-pro" class="mb-1 block text-[12px] font-medium">PRO (DeepSeek)</label>
-        <input id="clave-pro" type="password" autocomplete="off" placeholder="sk-…"
+        <label for="clave-groq" class="mb-1 block text-[12px] font-medium">Groq</label>
+        <input id="clave-groq" type="password" autocomplete="off" placeholder="gsk-…"
           class="w-full rounded-xl border border-[color:var(--linea)] bg-transparent px-3.5 py-2.5 text-[13px] outline-none placeholder:text-[color:var(--fg-suave)] focus:border-[color:var(--acento)]" />
       </section>
 
