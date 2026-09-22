@@ -90,6 +90,21 @@ primer intento puede fallar con `NetworkError`. El chat lo detecta solo:
 - si no hay internet (`navigator.onLine`), lo dice directamente en vez de reintentar;
 - si todo falla, el mensaje explica la causa en lugar del `TypeError` crudo del navegador.
 
+### CORS y el proxy `/api/reprebot`
+
+El backend tiene allowlist estricta de orígenes (verificado: solo acepta
+`http://localhost:5173` y `http://127.0.0.1:5173`; cualquier otro origen recibe
+`OPTIONS → 400` sin `Access-Control-Allow-Origin`). Por eso:
+
+- en dev usa **exactamente el puerto 5173** (`strictPort` está activado para que
+  Astro no salte en silencio a otro puerto, que fallaría por CORS);
+- en cualquier otro origen el frontend usa el proxy mismo-origen `/api/reprebot`,
+  que reenvía servidor-a-servidor donde no aplica CORS:
+  - Netlify: `netlify/functions/reprebot.mjs` + redirect en `netlify.toml`;
+  - Vercel: `api/reprebot.js`.
+- En `npm run dev` plano no hay proxy (responde 404): el chat lo detecta
+  (`SIN_PROXY`), no lo vuelve a intentar en la sesión y sigue por la vía directa.
+
 Causas típicas si persiste: sin internet, VPN/DNS, o un bloqueador (adblock) cortando
 `reprebot-api.onrender.com`. Groq tiene el mismo trato ante cortes de red.
 

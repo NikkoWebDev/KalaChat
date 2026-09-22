@@ -85,6 +85,37 @@ function sinConexion() {
   return typeof navigator !== 'undefined' && navigator.onLine === false
 }
 
+/** El proxy mismo-origen existe mientras no responda 404/405. */
+let proxyDisponible = true
+
+async function postDirecto(body, headers, signal) {
+  return fetch(`${REPREBOT_BASE_URL}/v1/chat/completions`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+    signal,
+    mode: 'cors',
+  })
+}
+
+/** Mismo-origen: /api/reprebot lo reenvía al backend sin pasar por CORS. */
+async function postProxy(body, apiKey, signal) {
+  const headers = { 'Content-Type': 'application/json' }
+  if (apiKey) headers['x-api-key'] = apiKey
+  const res = await fetch('/api/reprebot', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+    signal,
+  })
+  if (res.status === 404 || res.status === 405) {
+    const err = new Error('Proxy ausente en este entorno')
+    err.code = 'SIN_PROXY'
+    throw err
+  }
+  return res
+}
+
 /* ==========================================================================
    Reprebot · /v1/chat/completions
    SSE propio: {type:"sources"} → {type:"delta"} → {type:"done"}
@@ -95,7 +126,6 @@ async function* dialogarReprebot(mensajes, { signal, k }) {
     throw new Error('Sin conexión a internet. Revisa tu red e inténtalo de nuevo.')
   }
 
-  const url = `${REPREBOT_BASE_URL}/v1/chat/completions`
   const headers = { 'Content-Type': 'application/json' }
   const apiKey = getApiKey('reprebot')
   if (apiKey) headers['X-Api-Key'] = apiKey
@@ -105,7 +135,9 @@ async function* dialogarReprebot(mensajes, { signal, k }) {
   if (Number.isFinite(cuerpoK)) body.k = Math.min(20, Math.max(1, Math.trunc(cuerpoK)))
 
   // Render duerme el servicio en inactividad: el primer intento puede fallar
-  // a nivel red o con 502/503/504 mientras despierta. Se reintenta avisando.
+  // a nivel red o con 502/503/504 mientras despierta. Además el backend tiene
+  // allowlist de orígenes CORS: si el directo falla por CORS se usa el proxy
+  // mismo-origen (/api/reprebot), que reenvía servidor-a-servidor.
   const ESPERAS = [3000, 10000]
   let res = null
 
@@ -114,20 +146,33 @@ async function* dialogarReprebot(mensajes, { signal, k }) {
       yield { tipo: 'estado', texto: `El servidor está despertando… (intento ${intento + 1})` }
     }
 
+    let directoFalloRed = false
     try {
-      res = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-        signal,
-        mode: 'cors',
-      })
+      res = await postDirecto(body, headers, signal)
     } catch (err) {
       if (signal?.aborted) throw err
       if (sinConexion()) {
         throw new Error('Sin conexión a internet. Revisa tu red e inténtalo de nuevo.')
       }
-      if (intento < ESPERAS.length && esFalloRed(err)) {
+      if (!esFalloRed(err)) {
+        throw new Error('No se pudo contactar el servidor de Reprebot. Reintenta en un minuto.')
+      }
+      directoFalloRed = true
+    }
+
+    if (directoFalloRed && proxyDisponible && !sinConexion()) {
+      try {
+        res = await postProxy(body, apiKey, signal)
+        directoFalloRed = false
+      } catch (err) {
+        if (signal?.aborted) throw err
+        if (err?.code === 'SIN_PROXY') proxyDisponible = false
+        res = null
+      }
+    }
+
+    if (!res || directoFalloRed) {
+      if (intento < ESPERAS.length) {
         await esperar(ESPERAS[intento])
         continue
       }
