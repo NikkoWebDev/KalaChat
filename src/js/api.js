@@ -1,282 +1,184 @@
-import { parseSSEStream } from './utils.js'
-import { API_DEFAULTS, SYSTEM_PROMPTS } from './constants.js'
+import { IDENTIDAD, MODELOS, API_KEYS_ENV, REPREBOT_BASE_URL, SEGUIMIENTO } from './constants.js'
 
-const OPENROUTER_BASE = import.meta.env.VITE_OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1'
+let overrides = {}
 
-const ENV_KEYS = {
-  openrouter: import.meta.env.VITE_OPENROUTER_API_KEY || '',
-  gemini: import.meta.env.VITE_GEMINI_API_KEY || '',
-  pro: import.meta.env.VITE_PRO_API_KEY || '',
+export function setSettingsOverrides(next) {
+  overrides = next || {}
 }
 
-const PROVIDER_CONFIGS = {
-  'openrouter-free': {
-    baseUrl: OPENROUTER_BASE,
-    model: import.meta.env.VITE_OPENROUTER_MODEL_FREE || 'openrouter/free',
-    type: 'openai', label: 'KALA OpenRouter', mode: 'free', badge: 'Mejor', group: 'openrouter',
-  },
-  'openrouter-nemotron': {
-    baseUrl: OPENROUTER_BASE,
-    model: import.meta.env.VITE_OPENROUTER_MODEL_NEMOTRON || 'nvidia/nemotron-3-super-120b-a12b:free',
-    type: 'openai', label: 'Nemotron 3', mode: 'free', badge: null, group: 'openrouter',
-  },
-  'openrouter-gptoss': {
-    baseUrl: OPENROUTER_BASE,
-    model: import.meta.env.VITE_OPENROUTER_MODEL_GPTOSS || 'openai/gpt-oss-120b:free',
-    type: 'openai', label: 'GPT-OSS', mode: 'free', badge: null, group: 'openrouter',
-  },
-  'openrouter-minimax': {
-    baseUrl: OPENROUTER_BASE,
-    model: import.meta.env.VITE_OPENROUTER_MODEL_MINIMAX || 'minimax/minimax-m2.5:free',
-    type: 'openai', label: 'Minimax', mode: 'free', badge: null, group: 'openrouter',
-  },
-  'openrouter-dolphin': {
-    baseUrl: OPENROUTER_BASE,
-    model: import.meta.env.VITE_OPENROUTER_MODEL_DOLPHIN || 'cognitivecomputations/dolphin-mistral-24b-venice-edition:free',
-    type: 'openai', label: 'Dolphin', mode: 'free', badge: 'Sin censura', group: 'openrouter',
-  },
-  gemini: {
-    baseUrl: import.meta.env.VITE_GEMINI_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta',
-    model: import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.0-flash',
-    type: 'gemini', label: 'Gemini Flash', mode: 'free', badge: null, group: 'gemini',
-  },
-  v4: {
-    baseUrl: import.meta.env.VITE_PRO_BASE_URL || 'https://api.deepseek.com',
-    model: import.meta.env.VITE_PRO_MODEL_V4 || 'deepseek-chat',
-    type: 'openai', label: 'KALA PRO Flash', mode: 'pro', badge: 'Flash', group: 'pro',
-  },
-  'v4-pro': {
-    baseUrl: import.meta.env.VITE_PRO_BASE_URL || 'https://api.deepseek.com',
-    model: import.meta.env.VITE_PRO_MODEL_V4_PRO || 'deepseek-reasoner',
-    type: 'openai', label: 'KALA PRO²', mode: 'pro', badge: 'PRO²', group: 'pro',
-  },
+/** Los placeholders del .env (sk-or-placeholder, AIza-placeholder, …) no son claves reales. */
+function claveValida(v) {
+  const s = String(v || '').trim()
+  if (!s) return ''
+  if (/placeholder/i.test(s)) return ''
+  if (/^(sk-or-)?placeholder$/i.test(s)) return ''
+  if (s === 'sk-placeholder') return ''
+  return s
 }
 
-let settingsOverrides = {}
-
-function getCustomApiKey(providerId, group) {
-  if (settingsOverrides[group]?.apiKey) return settingsOverrides[group].apiKey
-  if (settingsOverrides[providerId]?.apiKey) return settingsOverrides[providerId].apiKey
-  return ''
+export function getApiKey(grupo) {
+  return claveValida(overrides[grupo]?.apiKey) || claveValida(API_KEYS_ENV[grupo])
 }
 
-export function getProviderConfig(providerId) {
-  const base = PROVIDER_CONFIGS[providerId]
+function modeloConfig(id) {
+  const base = MODELOS[id]
   if (!base) return null
-
-  let apiKey = getCustomApiKey(providerId, base.group)
-  if (!apiKey) apiKey = ENV_KEYS[base.group] || ''
-
-  return { ...base, apiKey }
+  return { id, ...base, apiKey: base.tipo === 'reprebot' ? getApiKey('reprebot') : getApiKey(base.grupo) }
 }
 
-export function setSettingsOverrides(overrides) {
-  settingsOverrides = overrides
+export function getModelo(id) {
+  return modeloConfig(id)
 }
 
-export function getAvailableProviders(mode) {
-  return getAllProviders().filter(p => p.mode === mode)
+export function getModelos() {
+  return Object.keys(MODELOS).map(modeloConfig)
 }
 
-export function getAllProviders() {
-  return Object.entries(PROVIDER_CONFIGS)
-    .map(([id]) => ({ id, ...getProviderConfig(id) }))
+/** El unico modelo disponible es Kala AI 4.3 (reprebot). */
+export function modeloDisponible(id) {
+  return Boolean(MODELOS[id])
 }
 
-export function getDefaultProvider(mode) {
-  const providers = getAvailableProviders(mode)
-  return providers.length > 0 ? providers[0].id : null
+/** Historial recortado para no inflar el prompt del RAG. */
+function historialReciente(mensajes, max = 4) {
+  return mensajes
+    .filter(m => m.content && !m.error)
+    .slice(-max)
+    .map(m => `${m.role === 'user' ? 'Usuario' : IDENTIDAD.nombre}: ${m.content.slice(0, 900)}`)
+    .join('\n\n')
 }
 
-export function isProviderConfigured(providerId) {
-  const cfg = PROVIDER_CONFIGS[providerId]
-  if (!cfg) return false
-  if (getCustomApiKey(providerId, cfg.group)) return true
-  if (ENV_KEYS[cfg.group]) return true
-  return true
+function preguntaConContexto(mensajes) {
+  const pregunta = mensajes[mensajes.length - 1].content
+  const previos = mensajes.slice(0, -1)
+  if (previos.length === 0) return pregunta
+  const hilo = historialReciente(previos)
+  if (!hilo) return pregunta
+  return `Conversacion previa:\n${hilo}\n\n${SEGUIMIENTO}\n${pregunta}`
 }
 
-function buildParts(msg) {
-  const parts = [{ text: msg.content || '' }]
-  if (msg.images?.length) {
-    for (const img of msg.images) {
-      parts.push({ inlineData: { mimeType: img.mime, data: img.base64 } })
-    }
+function normalizarFuente(s) {
+  return {
+    docId: s?.doc_id || '',
+    nombre: s?.doc_name || 'Documento',
+    texto: s?.text || '',
+    score: typeof s?.score === 'number' ? s.score : null,
+    url: s?.source_url || '',
+    tipo: s?.doc_type || '',
   }
-  return parts
 }
 
-function buildContent(msg) {
-  const content = [{ type: 'text', text: msg.content || '' }]
-  if (msg.images?.length) {
-    for (const img of msg.images) {
-      content.push({
-        type: 'image_url',
-        image_url: { url: `data:${img.mime};base64,${img.base64}` },
-      })
-    }
-  }
-  return content
+function esperar(ms) {
+  return new Promise(r => setTimeout(r, ms))
 }
 
-function toApiMessages(messages, providerType) {
-  if (providerType === 'gemini') {
-    return messages.map((m) => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: buildParts(m),
-    }))
-  }
-  return messages.map((m) => {
-    if (m.images?.length) {
-      return { role: m.role, content: buildContent(m) }
-    }
-    return { role: m.role, content: m.content }
-  })
-}
+/* ==========================================================================
+   Reprebot · /v1/chat/completions
+   SSE propio: {type:"sources"} → {type:"delta"} → {type:"done"}
+   ========================================================================== */
 
-function extractContent(parsed, providerType) {
-  if (providerType === 'gemini') {
-    const candidates = parsed.candidates
-    if (!candidates?.length) return ''
-    return candidates[0].content?.parts?.[0]?.text || ''
-  }
-  return parsed.choices?.[0]?.delta?.content || parsed.choices?.[0]?.text || ''
-}
+async function* dialogarReprebot(mensajes, { signal, k }) {
+  const url = `${REPREBOT_BASE_URL}/v1/chat/completions`
+  const headers = { 'Content-Type': 'application/json' }
+  const apiKey = getApiKey('reprebot')
+  if (apiKey) headers['X-Api-Key'] = apiKey
 
-async function fetchStream(url, body, headers, signal) {
-  const response = await fetch(url, {
+  const body = { messages: [{ role: 'user', content: preguntaConContexto(mensajes) }], stream: true }
+  const cuerpoK = Number(k)
+  if (Number.isFinite(cuerpoK)) body.k = Math.min(20, Math.max(1, Math.trunc(cuerpoK)))
+
+  const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...headers },
+    headers,
     body: JSON.stringify(body),
     signal,
+    mode: 'cors',
   })
-  if (!response.ok) {
-    const text = await response.text().catch(() => '')
-    throw new Error(`Error API (${response.status}): ${text || response.statusText}`)
+
+  if (!res.ok) {
+    const detalle = await res.text().catch(() => '')
+    let mensaje = detalle
+    try {
+      const parsed = JSON.parse(detalle)
+      if (typeof parsed?.detail === 'string') mensaje = parsed.detail
+    } catch { /* respuesta sin JSON */ }
+    throw new Error(`La API respondio ${res.status}${mensaje ? `: ${mensaje.slice(0, 200)}` : ''}`)
   }
-  return response
-}
 
-function getSystemPrompt(providerId) {
-  return SYSTEM_PROMPTS[providerId] || SYSTEM_PROMPTS['openrouter-free']
-}
+  const content = res.headers.get('content-type') || ''
 
-export async function* streamChat(messages, { provider, signal, thinking } = {}) {
-  const config = getProviderConfig(provider)
-  if (!config) throw new Error(`Provider "${provider}" no configurado`)
-
-  const systemPrompt = getSystemPrompt(provider)
-  const apiMessages = toApiMessages(messages, config.type)
-
-  if (!config.apiKey) {
-    yield* streamViaProxy(apiMessages, provider, systemPrompt, signal, thinking)
+  // El servicio devuelve JSON plano cuando no hay stream disponible
+  if (content.includes('application/json')) {
+    const data = await res.json()
+    const fuentes = (data.sources || []).map(normalizarFuente)
+    if (fuentes.length) yield { tipo: 'fuentes', fuentes }
+    if (data.answer) yield { tipo: 'texto', texto: data.answer }
     return
   }
 
-  if (config.type === 'gemini') {
-    yield* streamGemini(apiMessages, config, systemPrompt, signal)
-  } else {
-    const messagesWithSystem = [{ role: 'system', content: systemPrompt }, ...apiMessages]
-    yield* streamOpenAI(messagesWithSystem, config, signal, thinking)
-  }
-}
+  let fuentes = []
 
-async function* streamViaProxy(messages, provider, systemPrompt, signal, thinking) {
-  const body = { provider, messages, systemPrompt }
-  if (thinking) body.thinking = true
-  const customKey = getCustomApiKey(provider, PROVIDER_CONFIGS[provider]?.group)
-  if (customKey) body.apiKey = customKey
+  // Se recorre el cuerpo a mano y se parsea linea por linea: una sola pasada
+  // en vez de un generador de segundo nivel.
+  const reader = res.body.getReader()
+  const dec = new TextDecoder()
+  let buffer = ''
 
-  const response = await fetch('/api/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    signal,
-  })
-  if (!response.ok) {
-    const text = await response.text().catch(() => '')
-    throw new Error(`Error API (${response.status}): ${text || response.statusText}`)
-  }
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
 
-  for await (const data of parseSSEStream(response.body.getReader())) {
-    if (!data) continue
-    try {
-      const parsed = JSON.parse(data)
-      if (parsed.type === 'reasoning') {
-        if (parsed.text) yield { type: 'reasoning', text: parsed.text }
-      } else if (parsed.type === 'content') {
-        if (parsed.text) yield { type: 'content', text: parsed.text }
+      buffer += dec.decode(value, { stream: true })
+      const lineas = buffer.split('\n')
+      buffer = lineas.pop() || ''
+
+      for (const linea of lineas) {
+        const limpia = linea.trim()
+        if (!limpia.startsWith('data:')) continue
+        const payload = limpia.slice(5).trim()
+        if (!payload || payload === '[DONE]') continue
+
+        let evento
+        try { evento = JSON.parse(payload) } catch { continue }
+
+        if (evento.type === 'sources') {
+          fuentes = (evento.sources || []).map(normalizarFuente)
+          if (fuentes.length) yield { tipo: 'fuentes', fuentes }
+        } else if (evento.type === 'delta') {
+          if (evento.text) yield { tipo: 'texto', texto: evento.text }
+        } else if (evento.type === 'done') {
+          return
+        }
       }
-    } catch { /* skip */ }
+    }
+  } finally {
+    try { reader.releaseLock() } catch { /* ya liberado */ }
   }
 }
 
-async function* streamOpenAI(messages, config, signal, thinking) {
-  const url = `${config.baseUrl}/chat/completions`
-  const headers = {
-    Authorization: `Bearer ${config.apiKey}`,
-  }
-  if (config.group === 'openrouter') {
-    headers['HTTP-Referer'] = window.location.origin
-    headers['X-Title'] = 'KalaChat'
-  }
+/* ==========================================================================
+   Entrada publica: Kala AI 4.3 (reprebot) es el unico modelo.
+   ========================================================================== */
 
-  const body = {
-    model: config.model,
-    messages,
-    stream: true,
-    max_tokens: API_DEFAULTS.maxTokens,
-  }
+/**
+ * Un turno de conversacion. Emite {tipo:'razonamiento'|'texto'|'fuentes'}.
+ * Reintenta una vez en el arranque en frio de Render (502/503/504).
+ */
+export async function* dialogar(mensajes, { modelo = 'reprebot', signal, k } = {}) {
+  if (!MODELOS[modelo]) throw new Error(`Modelo "${modelo}" desconocido`)
 
-  if (thinking) {
-    body.reasoning_effort = 'high'
-    body.thinking = { type: 'enabled' }
-  } else {
-    body.temperature = API_DEFAULTS.temperature
-  }
-
-  const response = await fetchStream(url, body, headers, signal)
-
-  for await (const data of parseSSEStream(response.body.getReader())) {
-    if (!data) continue
+  for (let intento = 0; ; intento++) {
     try {
-      const parsed = JSON.parse(data)
-      const choice = parsed.choices?.[0]
-      if (!choice) continue
-      const delta = choice.delta || {}
-      if (delta.reasoning_content) {
-        yield { type: 'reasoning', text: delta.reasoning_content }
+      yield* dialogarReprebot(mensajes, { signal, k })
+      return
+    } catch (err) {
+      const esArranque = /50[234]/.test(err.message)
+      if (intento === 0 && esArranque && !signal?.aborted) {
+        await esperar(2500)
+        continue
       }
-      const content = delta.content || choice.text || ''
-      if (content) yield { type: 'content', text: content }
-    } catch { /* skip */ }
+      throw err
+    }
   }
-}
-
-async function* streamGemini(messages, config, systemPrompt, signal) {
-  const url = `${config.baseUrl}/models/${config.model}:streamGenerateContent?key=${config.apiKey}`
-  const response = await fetchStream(url, {
-    contents: messages,
-    systemInstruction: { parts: [{ text: systemPrompt }] },
-    generationConfig: { temperature: API_DEFAULTS.temperature, maxOutputTokens: API_DEFAULTS.maxTokens },
-  }, {}, signal)
-
-  for await (const data of parseSSEStream(response.body.getReader())) {
-    if (!data) continue
-    try {
-      const parsed = JSON.parse(data)
-      const candidates = parsed.candidates
-      if (!candidates?.length) continue
-      const text = candidates[0].content?.parts?.[0]?.text
-      if (text) yield { type: 'content', text }
-    } catch { /* skip */ }
-  }
-}
-
-export async function chatCompletion(messages, { provider, signal } = {}) {
-  let full = ''
-  for await (const chunk of streamChat(messages, { provider, signal })) {
-    if (chunk.type === 'content') full += chunk.text
-  }
-  return full
 }

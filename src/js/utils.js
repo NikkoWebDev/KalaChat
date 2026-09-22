@@ -1,70 +1,73 @@
-export function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      const result = reader.result
-      const base64 = result.split(',')[1] || result
-      resolve(base64)
-    }
-    reader.onerror = () => reject(new Error(`Error reading ${file.name}`))
-    reader.readAsDataURL(file)
-  })
-}
-
 export function escapeHtml(str) {
-  return str
+  return String(str ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
 }
 
-export function escapeAttr(str) {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
+export function iconoInflar(clase, contenido, tam = 20) {
+  return `<svg class="${clase}" width="${tam}" height="${tam}" viewBox="0 0 20 20" fill="none" aria-hidden="true">${contenido}</svg>`
 }
 
-export async function* parseSSEStream(reader, { onData, onDone } = {}) {
-  const decoder = new TextDecoder()
-  let buffer = ''
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() || ''
-
-      for (const line of lines) {
-        const trimmed = line.trim()
-        if (!trimmed || !trimmed.startsWith('data:')) continue
-        const data = trimmed.slice(5).trim()
-        if (data === '[DONE]') {
-          onDone?.()
-          return
-        }
-        if (data) yield data
-      }
-    }
-  } finally {
-    reader.releaseLock()
-  }
+export function textoSeguro(node) {
+  return node?.textContent?.trim() || ''
 }
 
-export function createDebouncedRAF(fn) {
-  let ticking = false
-  return function (...args) {
-    if (!ticking) {
-      ticking = true
-      requestAnimationFrame(() => {
-        ticking = false
-        fn(...args)
-      })
-    }
+/** Captura el texto visible de la burbuja sin las fuentes citadas ni el razonamiento. */
+export function textoDeMensaje(fila) {
+  const cuerpo = fila.querySelector('[data-zona-texto]') || fila.querySelector('.msg-body')
+  if (!cuerpo) return ''
+  return (cuerpo.innerText ?? cuerpo.textContent ?? '').trim()
+}
+
+export async function copiar(texto) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(texto)
+      return true
+    } catch { /* cae al metodo viejo */ }
   }
+  const area = document.createElement('textarea')
+  area.value = texto
+  area.setAttribute('readonly', '')
+  area.style.cssText = 'position:fixed;top:-1000px;opacity:0'
+  document.body.appendChild(area)
+  area.select()
+  let ok = false
+  try { ok = document.execCommand('copy') } catch { ok = false }
+  area.remove()
+  return ok
+}
+
+export function descargar(nombre, contenido, tipo = 'text/markdown;charset=utf-8') {
+  const url = URL.createObjectURL(new Blob([contenido], { type: tipo }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = nombre
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+export function slug(texto, max = 48) {
+  return String(texto || 'conversacion')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, max) || 'conversacion'
+}
+
+/** Evita scroll forzado cuando el usuario esta leyendo mas arriba. */
+export function cercaDelFondo(contenedor, margen = 140) {
+  if (!contenedor) return true
+  return contenedor.scrollHeight - contenedor.scrollTop - contenedor.clientHeight < margen
+}
+
+export function alFondo(contenedor, suave = false) {
+  if (!contenedor) return
+  contenedor.scrollTo({ top: contenedor.scrollHeight, behavior: suave ? 'smooth' : 'auto' })
 }

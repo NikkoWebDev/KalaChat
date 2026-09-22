@@ -5,77 +5,88 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        ui: ['Satoshi', 'SF Pro Text', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
-        display: ['Instrument Serif', 'Georgia', 'serif'],
-        mono: ['JetBrains Mono', 'SF Mono', 'Fira Code', 'monospace'],
+        sans: ['Space Grotesk', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        serif: ['Source Serif 4', 'Georgia', 'serif'],
+        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace'],
       },
       colors: {
-        surface: {
-          DEFAULT: '#0C0C0E',
-          50: '#F5F5F0',
-          100: '#EDEDEF',
-          200: '#8E8E96',
-          300: '#5E5E66',
-          400: '#161618',
-          500: '#1E1E22',
-          600: '#242428',
-          700: '#26262B',
-          800: '#1C1C20',
-        },
-        gold: {
-          DEFAULT: '#C8A87C',
-          50: '#DCC09C',
-          100: '#A8855A',
-        },
+        // Semanticos: cambian solos con [data-theme]
+        page: 'var(--bg)',
+        panel: 'var(--bg-alt)',
+        ink: 'var(--fg)',
+        muted: 'var(--fg-suave)',
+        line: 'var(--linea)',
+        card: 'var(--card)',
+        surface: 'var(--card-solid)',
+        accent: 'var(--acento)',
+        accent2: 'var(--acento-2)',
+        activo: 'var(--activo)',
+        violeta: 'var(--violeta)',
+
+        // Paleta cruda UNAL
+        papel: '#F6EEE8',
+        'papel-2': '#E6E2D0',
+        tinta: '#191114',
+        'tinta-suave': '#907A67',
+        unal: '#18514A',
+        'unal-claro': '#3B908D',
+        'unal-verde': '#82B475',
+        dorado: '#C08A2E',
+        noche: '#0E1F1B',
+        'noche-2': '#152218',
+        morado: '#8F7CC0',
+      },
+      borderRadius: {
+        card: '18px',
+      },
+      boxShadow: {
+        glass: 'var(--glass-shadow)',
+        'glass-lg': 'var(--glass-shadow-lg)',
+        composer: '0 12px 40px -12px rgba(0,0,0,.45)',
+      },
+      maxWidth: {
+        prose: '46rem',
+      },
+      transitionTimingFunction: {
+        suave: 'cubic-bezier(.22,1,.36,1)',
       },
       animation: {
-        'message-slide': 'messageSlide 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-        'fade-in': 'fadeIn 0.25s ease forwards',
-        'modal-in': 'modalIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-        'dropdown-in': 'dropdownIn 0.2s ease forwards',
-        'toast-in': 'toastIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-        'toast-out': 'toastOut 0.3s ease 2.2s forwards',
-        'pulse-dot': 'typingBounce 1.4s ease-in-out infinite',
-        'slide-up': 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-        'scale-in': 'scaleIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-        'chevron-spin': 'chevronSpin 0.25s ease forwards',
+        'fade-in': 'fadeIn .3s ease forwards',
+        'slide-up': 'slideUp .4s cubic-bezier(.22,1,.36,1) forwards',
+        'modal-in': 'modalIn .32s cubic-bezier(.22,1,.36,1) forwards',
+        'dropdown-in': 'dropdownIn .18s cubic-bezier(.22,1,.36,1) forwards',
+        'toast-in': 'toastIn .3s cubic-bezier(.22,1,.36,1) forwards',
+        flotar: 'flotar 16s ease-in-out infinite alternate',
+        escribir: 'escribir 1.35s ease-in-out infinite',
       },
       keyframes: {
-        messageSlide: {
-          from: { opacity: '0', transform: 'translateY(8px)' },
-          to: { opacity: '1', transform: 'translateY(0)' },
-        },
         fadeIn: {
           from: { opacity: '0' },
           to: { opacity: '1' },
         },
+        slideUp: {
+          from: { opacity: '0', transform: 'translateY(14px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
         modalIn: {
-          from: { opacity: '0', transform: 'translateY(12px) scale(0.96)' },
+          from: { opacity: '0', transform: 'translateY(14px) scale(.97)' },
           to: { opacity: '1', transform: 'translateY(0) scale(1)' },
         },
         dropdownIn: {
-          from: { opacity: '0', transform: 'translateY(6px) scale(0.96)' },
+          from: { opacity: '0', transform: 'translateY(-6px) scale(.97)' },
           to: { opacity: '1', transform: 'translateY(0) scale(1)' },
         },
         toastIn: {
-          from: { opacity: '0', transform: 'translateX(-50%) translateY(16px)' },
-          to: { opacity: '1', transform: 'translateX(-50%) translateY(0)' },
+          from: { opacity: '0', transform: 'translate(-50%, 16px)' },
+          to: { opacity: '1', transform: 'translate(-50%, 0)' },
         },
-        toastOut: {
-          from: { opacity: '1', transform: 'translateX(-50%) translateY(0)' },
-          to: { opacity: '0', transform: 'translateX(-50%) translateY(-12px)' },
+        flotar: {
+          from: { transform: 'translate(0,0) scale(1)' },
+          to: { transform: 'translate(4%,-6%) scale(1.12)' },
         },
-        typingBounce: {
-          '0%, 60%, 100%': { transform: 'translateY(0)', opacity: '0.4' },
-          '30%': { transform: 'translateY(-6px)', opacity: '1' },
-        },
-        slideUp: {
-          from: { opacity: '0', transform: 'translateY(12px)' },
-          to: { opacity: '1', transform: 'translateY(0)' },
-        },
-        scaleIn: {
-          from: { opacity: '0', transform: 'scale(0.92)' },
-          to: { opacity: '1', transform: 'scale(1)' },
+        escribir: {
+          '0%, 60%, 100%': { transform: 'translateY(0)', opacity: '.35' },
+          '30%': { transform: 'translateY(-4px)', opacity: '1' },
         },
       },
     },

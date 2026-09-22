@@ -6,7 +6,7 @@ function isOriginAllowed(request) {
   try {
     const url = new URL(origin)
     const host = url.hostname
-    if (host === 'localhost' || host.endsWith('.netlify.app') || host.endsWith('.app')) return true
+    if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.netlify.app') || host.endsWith('.app')) return true
   } catch { return false }
   return false
 }
@@ -163,7 +163,7 @@ async function proxyOpenAI(messages, config, apiKey, systemPrompt, thinking) {
           }
         }
       } finally {
-        reader.releaseLock()
+        try { reader.releaseLock() } catch { /* ya liberado o abortado */ }
         controller.close()
       }
     },
@@ -180,10 +180,15 @@ async function proxyOpenAI(messages, config, apiKey, systemPrompt, thinking) {
 }
 
 async function proxyGemini(messages, config, apiKey, systemPrompt) {
-  const url = `${config.baseUrl}/models/${config.model}:streamGenerateContent?key=${apiKey}`
+  // El frontend envia [{role, content}]; Gemini espera {contents:[{role, parts:[{text}]}]}
+  const contents = (messages || []).map(m => ({
+    role: m.role === 'assistant' || m.role === 'model' ? 'model' : 'user',
+    parts: [{ text: m.content || m.text || '' }],
+  }))
+  const url = `${config.baseUrl}/models/${config.model}:streamGenerateContent?alt=sse&key=${apiKey}`
 
   const body = {
-    contents: messages,
+    contents,
     generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
   }
   if (systemPrompt) {
@@ -196,9 +201,52 @@ async function proxyGemini(messages, config, apiKey, systemPrompt) {
     body: JSON.stringify(body),
   })
 
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
+  if (!response.ok) {
+    const text = await response.text().catch(() => '')
+    return new Response(text, { status: response.status })
+  }
+
+  // Normaliza el SSE de Gemini al formato {type:'content'|'reasoning', text}
+  // que espera el frontend (igual que proxyOpenAI).
+  const encoder = new TextEncoder()
+  const decoder = new TextDecoder()
+  const reader = response.body.getReader()
+  let buffer = ''
+
+  const readable = new ReadableStream({
+    async start(controller) {
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+          for (const line of lines) {
+            const trimmed = line.trim()
+            if (!trimmed || !trimmed.startsWith('data:')) continue
+            const data = trimmed.slice(5).trim()
+            if (!data || data === '[DONE]') continue
+            try {
+              const parsed = JSON.parse(data)
+              const parts = parsed.candidates?.[0]?.content?.parts || []
+              for (const part of parts) {
+                if (part.text) {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'content', text: part.text })}\n\n`))
+                }
+              }
+            } catch { /* fragmento invalido */ }
+          }
+        }
+      } finally {
+        try { reader.releaseLock() } catch { /* ya liberado */ }
+        controller.close()
+      }
+    },
+  })
+
+  return new Response(readable, {
+    status: 200,
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',

@@ -2,36 +2,40 @@
 
 ---
 
-<div id="messages-container" class="flex-1 overflow-y-auto overflow-x-hidden flex flex-col scroll-smooth relative">
-  <div id="empty-state" class="flex flex-col items-center justify-center flex-1 px-8 py-10 text-center">
-    <div class="mb-6 opacity-0" style="animation:fadeIn .6s ease .1s forwards">
-      <div class="relative w-20 h-20 mx-auto">
-        <svg width="80" height="80" viewBox="0 0 80 80" fill="none" class="w-full h-full">
-          <rect x="4" y="4" width="72" height="72" rx="20" stroke="currentColor" stroke-width="1" stroke-opacity="0.08"/>
-          <rect x="4" y="4" width="72" height="72" rx="20" stroke="url(#g)" stroke-width="1" stroke-opacity="0.3"/>
-          <text x="40" y="50" font-family="'Instrument Serif','Georgia',serif" font-size="28" fill="currentColor" text-anchor="middle" opacity="0.3">K</text>
-          <defs>
-            <linearGradient id="g" x1="0" y1="0" x2="80" y2="80">
-              <stop offset="0%" stop-color="#C8A87C"/>
-              <stop offset="100%" stop-color="#C8A87C" stop-opacity="0.1"/>
-            </linearGradient>
-          </defs>
-        </svg>
+<div id="contenedor" class="relative flex-1 overflow-y-auto overflow-x-hidden">
+
+  <div class="blob" aria-hidden="true" style="width:340px;height:340px;top:-140px;left:-90px;background:var(--glow-1)"></div>
+  <div class="blob" aria-hidden="true" style="width:300px;height:300px;bottom:-160px;right:-70px;background:var(--glow-3);animation-delay:-6s"></div>
+
+  <div id="vacio" class="relative mx-auto flex min-h-full max-w-prose flex-col justify-center px-5 py-10">
+    <div class="relative mb-7 flex items-center gap-3">
+      <div class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl brand-mark">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 2l1.9 5.1L17 9l-5.1 1.9L10 16l-1.9-5.1L3 9l5.1-1.9z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="leading-tight">
+        <p class="text-[17px] font-bold tracking-tight">Reprebot</p>
+        <p class="text-[12px]" style="color:var(--fg-suave)">Kala AI 4.3 · Consejo de Estudiantes de Ingeniería de Sistemas</p>
       </div>
     </div>
-    <h2 class="font-display text-3xl font-normal text-surface-100 mb-2.5 tracking-tight opacity-0 lg:text-[34px]" style="animation:fadeIn .6s ease .2s forwards">¿En qué puedo ayudarte?</h2>
-    <p class="text-sm text-surface-200 mb-8 leading-relaxed opacity-0" style="animation:fadeIn .6s ease .3s forwards">Pregúntame lo que sea, estoy aquí para ti</p>
-    <div class="flex flex-wrap justify-center gap-2 max-w-[380px]">
-      <button class="suggestion-chip px-4 py-2.5 rounded-full text-sm text-surface-200 border border-surface-700 bg-surface-400/50 hover:bg-gold/10 hover:border-gold hover:text-gold transition-all duration-250 whitespace-nowrap opacity-0" style="animation:fadeIn .5s ease .4s forwards" data-prompt="Explica un concepto complejo de forma sencilla">Explica algo complejo</button>
-      <button class="suggestion-chip px-4 py-2.5 rounded-full text-sm text-surface-200 border border-surface-700 bg-surface-400/50 hover:bg-gold/10 hover:border-gold hover:text-gold transition-all duration-250 whitespace-nowrap opacity-0" style="animation:fadeIn .5s ease .5s forwards" data-prompt="Ayúdame a escribir un correo profesional">Redacta un correo</button>
-      <button class="suggestion-chip px-4 py-2.5 rounded-full text-sm text-surface-200 border border-surface-700 bg-surface-400/50 hover:bg-gold/10 hover:border-gold hover:text-gold transition-all duration-250 whitespace-nowrap opacity-0" style="animation:fadeIn .5s ease .6s forwards" data-prompt="Traduce este texto al inglés">Traduce un texto</button>
-      <button class="suggestion-chip px-4 py-2.5 rounded-full text-sm text-surface-200 border border-surface-700 bg-surface-400/50 hover:bg-gold/10 hover:border-gold hover:text-gold transition-all duration-250 whitespace-nowrap opacity-0" style="animation:fadeIn .5s ease .7s forwards" data-prompt="Dame ideas creativas para un proyecto">Ideas creativas</button>
-    </div>
+
+    <h1 class="font-serif text-[30px] font-normal leading-[1.15] tracking-tight lg:text-[38px]">
+      Pregúntale a <span class="texto-grad">Reprebot</span>
+    </h1>
+    <p class="mt-3 max-w-[46ch] text-[14.5px] leading-relaxed" style="color:var(--fg-suave)">
+      Resuelvo dudas sobre el plan de estudios, la malla curricular, la normativa de la UNAL y los servicios
+      de la Facultad de Ingeniería. Cada respuesta viene con las fuentes citadas.
+    </p>
+
+    <div id="sugerencias" class="mt-8 grid gap-2 sm:grid-cols-2"></div>
+
+    <p class="mt-7 text-[11px] leading-relaxed" style="color:var(--fg-suave)">
+      Beta del CEIS. Reprebot puede equivocarse: verifica siempre con la fuente citada o con la Secretaría de la Facultad.
+    </p>
   </div>
 
-  <div id="messages-list" class="flex flex-col gap-1.5 px-3 pb-2 pt-4 min-h-full justify-end lg:px-6 lg:pb-4 lg:pt-6"></div>
-  <div id="scroll-anchor" class="h-px shrink-0"></div>
-  <button id="scroll-bottom-btn" class="scroll-bottom-btn" aria-label="Ir al final">
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 6l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <div id="mensajes" class="mx-auto flex max-w-[52rem] flex-col pb-6 pt-5"></div>
+
+  <button id="ir-abajo" type="button" class="ir-abajo" aria-label="Ir al final">
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M3.5 6.5L8 11l4.5-4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </button>
 </div>

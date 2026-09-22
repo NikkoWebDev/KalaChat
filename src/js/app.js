@@ -1,867 +1,827 @@
-import { streamChat, getProviderConfig, getAllProviders, isProviderConfigured, setSettingsOverrides } from './api.js'
+import { dialogar, getModelo, setSettingsOverrides } from './api.js'
 import {
-  renderMessage, renderStreamingMessage, updateStreamingContent,
-  finalizeStreamingContent, renderTypingIndicator, removeTypingIndicator,
-  formatConversationDate, setupMessageInteractions, initRenderer,
-  showStreamingReasoning, updateStreamingReasoning, finalizeStreamingReasoning,
+  initRenderer, crearMensaje, crearMensajeStreaming, pintarTexto, pintarFuentes,
+  pintarRazonamiento, escribirEscribiendo, formatoFecha, markdown,
 } from './chat.js'
-import { escapeHtml, fileToBase64 } from './utils.js'
-import { STORAGE_KEYS, DEFAULTS, UI } from './constants.js'
+import { escapeHtml, copiar, descargar, slug, cercaDelFondo, alFondo, textoDeMensaje } from './utils.js'
+import { STORAGE_KEYS, DEFAULTS, UI, IDENTIDAD, SUGERENCIAS, MODELOS } from './constants.js'
 
-let abortController = null
-let state = { ...DEFAULTS }
-let currentFiles = []
+const $ = sel => document.querySelector(sel)
+const $$ = sel => document.querySelectorAll(sel)
 
-const $ = (sel) => document.querySelector(sel)
-const $$ = (sel) => document.querySelectorAll(sel)
+let estado = { ...DEFAULTS, conversaciones: [] }
+let adjuntos = []
+let abortador = null
+let generando = false
+let convActual = null
 
 const el = {}
 
-function cacheElements() {
-  const ids = [
-    'sidebar', 'sidebar-overlay', 'menu-btn', 'main', 'messages-list',
-    'messages-container', 'empty-state', 'message-input', 'send-btn',
-    'header', 'theme-btn', 'provider-selector', 'provider-dropdown',
-    'provider-label', 'provider-badge', 'dropdown-free-group',
-    'cost-modal',
-    'cost-modal-accept', 'cost-modal-cancel', 'dont-show-again',
-    'conversation-list', 'new-chat-btn-side', 'settings-btn',
-    'settings-modal', 'settings-close', 'settings-save',
-    'settings-openrouter', 'settings-gemini', 'settings-pro',
-    'file-input', 'attach-btn', 'file-list', 'settings-provider-info',
-    'thinking-track', 'thinking-label-text', 'thinking-label-wrap',
-    'settings-thinking-track', 'settings-thinking-wrap', 'settings-thinking-label',
-    'scroll-bottom-btn', 'theme-color-meta',
-  ]
-  ids.forEach(id => { el[id] = $(`#${id}`) })
-  el.suggestionChips = $$('.suggestion-chip')
-  el.settingsInputs = {
-    openrouter: el['settings-openrouter'],
-    gemini: el['settings-gemini'],
-    pro: el['settings-pro'],
-  }
-}
+const ICONO_ENVIAR = '<path d="M2.5 10L17 3.5 12 16l-2.6-4.6L2.5 10z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>'
+const ICONO_PARAR = '<rect x="6" y="6" width="8" height="8" rx="1.5" fill="currentColor"/>'
 
-function loadState() {
+/* ------------------------------------------------------------------ */
+/* Estado persistente                                                  */
+/* ------------------------------------------------------------------ */
+
+function cargarEstado() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.STATE)
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      state = { ...DEFAULTS, ...parsed }
-      return
+    const bruto = localStorage.getItem(STORAGE_KEYS.STATE)
+    if (bruto) {
+      const guardado = JSON.parse(bruto)
+      estado = { ...DEFAULTS, ...guardado, conversaciones: guardado.conversaciones || [] }
     }
-  } catch { /* ignore */ }
-  state = { ...DEFAULTS }
+  } catch { /* arranca limpio */ }
+
+  if (!getModelo(estado.modelo)) estado.modelo = DEFAULTS.modelo
+  convActual = estado.conversaciones.find(c => c.id === estado.currentId) || null
 }
 
-function providerMode(id) {
-  return getProviderConfig(id)?.mode || 'free'
-}
-
-function saveState() {
+function guardarEstado() {
   try {
-    const toStore = {
-      mode: providerMode(state.provider),
-      theme: state.theme,
-      thinking: state.thinking,
-      conversations: state.conversations.map(c => ({
+    localStorage.setItem(STORAGE_KEYS.STATE, JSON.stringify({
+      theme: estado.theme,
+      k: estado.k,
+      modelo: estado.modelo,
+      currentId: estado.currentId,
+      conversaciones: estado.conversaciones.map(c => ({
         ...c,
-        messages: c.messages.slice(-UI.maxStoredMessages)
+        messages: c.messages.slice(-UI.maxStoredMessages),
       })),
-      currentId: state.currentId,
-      provider: state.provider,
-      costWarningDismissed: state.costWarningDismissed,
-    }
-    localStorage.setItem(STORAGE_KEYS.STATE, JSON.stringify(toStore))
-  } catch { /* ignore */ }
+    }))
+  } catch { /* cuota llena o modo privado */ }
 }
 
-function applyTheme(theme) {
-  document.documentElement.setAttribute('data-theme', theme)
-  state.theme = theme
-  updateThemeColorMeta()
-  saveState()
-  updateSettingsProviderInfo()
+function guardarAjustes(payload) {
+  try { localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(payload)) } catch { /* ignora */ }
 }
 
-function updateThemeColorMeta() {
-  const meta = el['theme-color-meta']
-  if (!meta) return
-  meta.content = state.theme === 'dark' ? '#0C0C0E' : '#F5F5F0'
+function leerAjustes() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.SETTINGS) || '{}') } catch { return {} }
 }
 
-function toggleSidebar() { document.body.classList.toggle('sidebar-open') }
-function closeSidebar() { document.body.classList.remove('sidebar-open') }
+/* ------------------------------------------------------------------ */
+/* Conversaciones                                                      */
+/* ------------------------------------------------------------------ */
 
-function getCurrentConversation() {
-  return state.conversations.find(c => c.id === state.currentId)
-}
-
-function createNewConversation() {
-  const id = `conv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+function nuevaConversacion() {
+  const id = `c_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`
   const conv = {
     id,
-    title: 'Nueva conversación',
+    title: 'Nueva conversacion',
     messages: [],
-    provider: state.provider,
-    mode: providerMode(state.provider),
+    modelo: estado.modelo,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   }
-  state.conversations.unshift(conv)
-  state.currentId = id
-  saveState()
-  renderConversationList()
-  switchToConversation(id)
+  estado.conversaciones.unshift(conv)
+  estado.currentId = id
+  convActual = conv
+  guardarEstado()
+  pintarLista()
+  pintarMensajes()
   return conv
 }
 
-function switchToConversation(id) {
-  state.currentId = id
-  saveState()
-  renderMessages()
-  renderConversationList()
-  closeSidebar()
+function abrirConversacion(id) {
+  estado.currentId = id
+  convActual = estado.conversaciones.find(c => c.id === id) || null
+  guardarEstado()
+  pintarLista()
+  pintarMensajes()
+  cerrarMenu()
 }
 
-function updateProviderUI() {
-  const cfg = getProviderConfig(state.provider)
-
-  if (cfg && el['provider-label'] && el['provider-badge']) {
-    el['provider-label'].textContent = cfg.label
-    const isFree = cfg.mode === 'free'
-    el['provider-badge'].textContent = isFree ? 'Gratuito' : 'PRO'
-    el['provider-badge'].className = `provider-cost ${isFree ? 'free-cost' : 'pro-cost'}`
-  }
-
-  el['dropdown-free-group']?.querySelectorAll('.dropdown-item').forEach(item => {
-    item.setAttribute('aria-selected', item.dataset.provider === state.provider)
-  })
-  updateSettingsProviderInfo()
-}
-
-function buildDropdown() {
-  const providers = getAllProviders()
-
-  if (el['dropdown-free-group']) {
-    el['dropdown-free-group'].innerHTML = providers.map(p => {
-      const badge = p.mode === 'free' ? 'Gratis' : 'PRO'
-      const badgeClass = p.mode === 'free' ? 'free-badge' : 'pro-badge'
-      return `
-        <button class="dropdown-item" data-provider="${escapeHtml(p.id)}" role="option" aria-selected="${p.id === state.provider}">
-          <span class="dropdown-item-name">${escapeHtml(p.label)}${p.badge ? ` <span style="font-size:10px;color:var(--color-gold,#C8A87C);font-weight:600">· ${escapeHtml(p.badge)}</span>` : ''}</span>
-          <span class="dropdown-item-badge ${badgeClass}">${badge}</span>
-        </button>`
-    }).join('')
-  }
-
-  el['dropdown-free-group']?.querySelectorAll('.dropdown-item').forEach(bindDropdownItem)
-}
-
-function bindDropdownItem(item) {
-  item.addEventListener('click', () => {
-    const providerId = item.dataset.provider
-    const cfg = getProviderConfig(providerId)
-
-    if (cfg?.mode === 'pro' && !state.costWarningDismissed) {
-      showCostModal(() => {
-        state.provider = providerId
-        updateProviderUI()
-        saveState()
-      })
-      el['provider-dropdown'].classList.add('hidden')
-      return
-    }
-
-    state.provider = providerId
-    updateProviderUI()
-    saveState()
-    el['provider-dropdown'].classList.add('hidden')
-  })
-}
-
-function showModal(modal) {
-  modal.classList.remove('hidden')
-}
-
-function hideModal(modal) {
-  modal.classList.add('hidden')
-}
-
-function showCostModal(onAccept) {
-  showModal(el['cost-modal'])
-  el['dont-show-again'].checked = false
-
-  const handleAccept = () => {
-    if (el['dont-show-again'].checked) {
-      state.costWarningDismissed = true
-      saveState()
-    }
-    hideModal(el['cost-modal'])
-    el['cost-modal-accept'].removeEventListener('click', handleAccept)
-    el['cost-modal-cancel'].removeEventListener('click', handleCancel)
-    onAccept?.()
-  }
-
-  const handleCancel = () => {
-    hideModal(el['cost-modal'])
-    el['cost-modal-accept'].removeEventListener('click', handleAccept)
-    el['cost-modal-cancel'].removeEventListener('click', handleCancel)
-  }
-
-  el['cost-modal-accept'].addEventListener('click', handleAccept)
-  el['cost-modal-cancel'].addEventListener('click', handleCancel)
-}
-
-function deleteConversation(id, e) {
-  e.stopPropagation()
-  const conv = state.conversations.find(c => c.id === id)
+function borrarConversacion(id, ev) {
+  ev?.stopPropagation()
+  const conv = estado.conversaciones.find(c => c.id === id)
   if (!conv) return
+  if (conv.messages.length && !confirm(`¿Borrar "${conv.title}"? No se puede deshacer.`)) return
 
-  if (!confirm(`¿Eliminar "${conv.title}"? Esta acción no se puede deshacer.`)) return
-
-  state.conversations = state.conversations.filter(c => c.id !== id)
-  if (state.currentId === id) {
-    if (state.conversations.length > 0) {
-      state.currentId = state.conversations[0].id
-    } else {
-      state.currentId = null
-      createNewConversation()
-      return
-    }
+  estado.conversaciones = estado.conversaciones.filter(c => c.id !== id)
+  if (estado.currentId === id) {
+    const siguiente = estado.conversaciones[0]
+    estado.currentId = siguiente?.id || null
+    convActual = siguiente || null
   }
-  saveState()
-  renderConversationList()
-  renderMessages()
+  guardarEstado()
+  pintarLista()
+  if (!convActual) nuevaConversacion()
+  else pintarMensajes()
 }
 
-function renderConversationList() {
-  if (!el['conversation-list']) return
+function renombrarConversacion(id) {
+  const conv = estado.conversaciones.find(c => c.id === id)
+  if (!conv) return
+  const nuevo = prompt('Nuevo titulo', conv.title)
+  if (!nuevo || !nuevo.trim()) return
+  conv.title = nuevo.trim().slice(0, 80)
+  guardarEstado()
+  pintarLista()
+}
 
-  if (state.conversations.length === 0) {
-    el['conversation-list'].innerHTML = '<div class="empty-conversations">Sin conversaciones aún</div>'
+function tituloDesde(texto) {
+  const limpio = texto.replace(/\s+/g, ' ').trim()
+  if (!limpio) return 'Nueva conversacion'
+  return limpio.length > UI.titleTruncateLength
+    ? limpio.slice(0, UI.titleTruncateLength).trimEnd() + '…'
+    : limpio
+}
+
+/* ------------------------------------------------------------------ */
+/* Pintado                                                             */
+/* ------------------------------------------------------------------ */
+
+function pintarLista() {
+  const cont = el.lista
+  if (!cont) return
+
+  const consulta = el.buscar?.value.trim().toLowerCase() || ''
+  const visibles = estado.conversaciones.filter(c => {
+    if (!consulta) return true
+    return c.title.toLowerCase().includes(consulta) ||
+      c.messages.some(m => m.content?.toLowerCase().includes(consulta))
+  })
+
+  if (!visibles.length) {
+    cont.innerHTML = `<p class="px-3 py-6 text-center text-[12px]" style="color:var(--fg-suave)">${consulta ? 'Sin coincidencias' : 'Aun no hay conversaciones'}</p>`
     return
   }
 
-  el['conversation-list'].innerHTML = state.conversations
-    .map(c => {
-      const isActive = c.id === state.currentId
-      const date = formatConversationDate(c.updatedAt)
-      const modeDisplay = (getProviderConfig(c.provider)?.mode || c.mode) === 'free' ? 'Free' : 'PRO'
-      return `
-        <div class="conversation-item ${isActive ? 'active' : ''}" data-conv-id="${escapeHtml(c.id)}">
-          <div class="conversation-item-title">${escapeHtml(c.title)}</div>
-          <div class="conversation-item-meta">
-            <span>${escapeHtml(date)}</span>
-            <span>·</span>
-            <span>${modeDisplay}</span>
-          </div>
-          <button class="delete-btn" data-conv-id="${escapeHtml(c.id)}" aria-label="Eliminar conversación">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4h10M5 4V2.5a.5.5 0 01.5-.5h3a.5.5 0 01.5.5V4m1 0v7.5a1 1 0 01-1 1H5a1 1 0 01-1-1V4m2 3v3m3-3v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-          </button>
-        </div>`
+  cont.innerHTML = visibles.map(c => {
+    const modelo = MODELOS[c.modelo]?.label || IDENTIDAD.nombre
+    return `<div class="conv-item" role="button" tabindex="0" data-id="${escapeHtml(c.id)}" aria-current="${c.id === estado.currentId}">
+      <div class="conv-titulo">${escapeHtml(c.title)}</div>
+      <div class="conv-meta"><span>${escapeHtml(formatoFecha(c.updatedAt))}</span><span>·</span><span>${escapeHtml(modelo)}</span></div>
+      <button class="conv-borrar" type="button" data-accion="borrar-conv" aria-label="Borrar conversacion">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2 4h10M5 4V2.5a.5.5 0 01.5-.5h3a.5.5 0 01.5.5V4m1 0v7.5a1 1 0 01-1 1H5a1 1 0 01-1-1V4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+      </button>
+    </div>`
+  }).join('')
+}
+
+let rafScroll = null
+function bajar(suave = false) {
+  if (rafScroll) cancelAnimationFrame(rafScroll)
+  rafScroll = requestAnimationFrame(() => {
+    alFondo(el.mensajes, suave)
+    rafScroll = null
+  })
+}
+
+async function pintarMensajes() {
+  const cont = el.mensajes
+  if (!cont) return
+  const mensajes = convActual?.messages || []
+  cont.innerHTML = ''
+  el.vacio.hidden = mensajes.length > 0
+  if (!mensajes.length) return
+
+  const nodos = await Promise.all(mensajes.map(m => crearMensaje(m)))
+  nodos.forEach(n => cont.appendChild(n))
+  bajar()
+}
+
+function mostrarAviso(texto) {
+  document.querySelector('.aviso')?.remove()
+  const aviso = document.createElement('div')
+  aviso.className = 'aviso'
+  aviso.textContent = texto
+  document.body.appendChild(aviso)
+  setTimeout(() => aviso.remove(), UI.toastDuration)
+}
+
+/* ------------------------------------------------------------------ */
+/* Modelo unico: Kala AI 4.3                                             */
+/* ------------------------------------------------------------------ */
+
+function pintarEtiquetaModelo() {
+  const m = getModelo(estado.modelo)
+  if (el.modeloLabel) el.modeloLabel.textContent = m?.label || IDENTIDAD.nombre
+  if (el.modeloSello) {
+    el.modeloSello.textContent = m?.sello || 'Documental'
+    el.modeloSello.className = m?.modo === 'pro' ? 'sello-pro' : 'sello-gratis'
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Dialogo                                                             */
+/* ------------------------------------------------------------------ */
+
+function bloqueosDeEntrada(activo) {
+  el.enviar.disabled = activo ? false : !el.input.value.trim() && !adjuntos.length
+  if (el.adjuntar) el.adjuntar.disabled = activo
+  if (el.input) el.input.disabled = false
+}
+
+function ponerBotonParar() {
+  el.enviar.classList.add('deteniendo')
+  el.enviar.innerHTML = `<svg width="18" height="18" viewBox="0 0 20 20" fill="none">${ICONO_PARAR}</svg>`
+  el.enviar.setAttribute('aria-label', 'Detener generacion')
+}
+
+function ponerBotonEnviar() {
+  el.enviar.classList.remove('deteniendo')
+  el.enviar.innerHTML = `<svg width="18" height="18" viewBox="0 0 20 20" fill="none">${ICONO_ENVIAR}</svg>`
+  el.enviar.setAttribute('aria-label', 'Enviar mensaje')
+}
+
+async function enviarTexto(textoForzado) {
+  if (generando) return
+
+  const texto = (textoForzado ?? el.input.value).trim()
+  if (!texto && !adjuntos.length) return
+
+  const archivos = adjuntos.slice()
+  adjuntos = []
+  pintarAdjuntos()
+
+  if (!convActual) nuevaConversacion()
+
+  const partes = archivos.map(a => `[${a.nombre}]\n\`\`\`\n${a.contenido}\n\`\`\``).join('\n\n')
+  const contenido = partes ? `${partes}\n\n${texto}` : texto
+
+  const msgUsuario = { id: `m_${Date.now().toString(36)}`, role: 'user', content: contenido, timestamp: Date.now() }
+  convActual.messages.push(msgUsuario)
+  convActual.updatedAt = Date.now()
+  if (convActual.messages.filter(m => m.role === 'user').length === 1) {
+    convActual.title = tituloDesde(texto || archivos[0]?.nombre || 'Nueva conversacion')
+  }
+
+  el.input.value = ''
+  el.input.style.height = 'auto'
+  el.vacio.hidden = true
+  el.mensajes.appendChild(await crearMensaje(msgUsuario))
+  pintarLista()
+  guardarEstado()
+  bajar()
+
+  await generar(convActual)
+}
+
+async function generar(conv) {
+  const idBot = `m_${Date.now().toString(36)}b`
+  const cfg = getModelo(estado.modelo)
+
+  const fila = crearMensajeStreaming(idBot, { modelo: estado.modelo, modeloLabel: cfg?.label })
+  el.mensajes.appendChild(fila)
+  bajar()
+
+  generando = true
+  ponerBotonParar()
+  bloqueosDeEntrada(true)
+  abortador = new AbortController()
+
+  let acumulado = ''
+  let razonamiento = ''
+  let fuentes = []
+  let pintando = false
+  let pendiente = false
+
+  // Repinta a lo sumo una vez por frame: el markdown completo en cada chunk
+  // bloquea el hilo principal cuando la respuesta pasa de ~1000 caracteres.
+  const programarPintado = () => {
+    pendiente = true
+    if (pintando) return
+    pintando = true
+    requestAnimationFrame(async () => {
+      pendiente = false
+      await pintarTexto(fila, acumulado, true)
+      pintando = false
+      if (cercaDelFondo(el.contenedor)) bajar()
     })
-    .join('')
-
-  el['conversation-list'].querySelectorAll('.conversation-item').forEach(item => {
-    item.addEventListener('click', () => switchToConversation(item.dataset.convId))
-  })
-  el['conversation-list'].querySelectorAll('.delete-btn').forEach(btn => {
-    btn.addEventListener('click', e => deleteConversation(btn.dataset.convId, e))
-  })
-}
-
-async function renderMessages() {
-  if (!el['messages-list']) return
-  const messages = getCurrentConversation()?.messages || []
-  el['messages-list'].innerHTML = ''
-
-  if (messages.length === 0) {
-    if (el['empty-state']) el['empty-state'].style.display = 'flex'
-    return
   }
 
-  if (el['empty-state']) el['empty-state'].style.display = 'none'
-
-  const fragments = await Promise.all(messages.map(msg => renderMessage(msg)))
-  fragments.forEach(f => el['messages-list'].appendChild(f))
-
-  scrollToBottom()
-}
-
-let scrollRafId = null
-function scrollToBottom() {
-  if (scrollRafId) cancelAnimationFrame(scrollRafId)
-  scrollRafId = requestAnimationFrame(() => {
-    if (el['messages-container']) {
-      el['messages-container'].scrollTop = el['messages-container'].scrollHeight
-    }
-    scrollRafId = null
-  })
-}
-
-function showToast(message) {
-  const old = document.querySelector('.toast')
-  if (old) old.remove()
-
-  const toast = document.createElement('div')
-  toast.className = 'toast'
-  toast.textContent = message
-  document.body.appendChild(toast)
-
-  setTimeout(() => {
-    if (toast.parentNode) toast.remove()
-  }, UI.toastDuration)
-}
-
-async function sendMessage() {
-  const text = el['message-input']?.value.trim() || ''
-  if ((!text && currentFiles.length === 0) || state.sending) return
-
-  let conv = getCurrentConversation()
-  if (!conv) conv = createNewConversation()
-
-  if (!isProviderConfigured(state.provider)) {
-    const name = getProviderConfig(state.provider)?.label || state.provider
-    showToast(`Configura API key para ${name} en Ajustes`)
-    return
-  }
-
-  state.sending = true
-  el['send-btn'].disabled = true
-  el['send-btn'].classList.add('sending')
-  el['message-input'].disabled = true
-  if (el['empty-state']) el['empty-state'].style.display = 'none'
-
-  const images = currentFiles.filter(f => f.type === 'image').map(f => ({
-    name: f.name, base64: f.base64, mime: f.mime,
-  }))
-  const textFiles = currentFiles.filter(f => f.type !== 'image')
-
-  let messageText = text
-
-  if (textFiles.length > 0) {
-    const fileBlocks = textFiles.map(f =>
-      `[Archivo: ${f.name}]\n\`\`\`\n${f.content}\n\`\`\``
-    ).join('\n\n')
-    messageText = `${fileBlocks}\n\n${text}`
-  }
-
-  currentFiles = []
-  renderFileList()
-
-  const userMsg = {
-    id: `msg_${Date.now()}`,
-    role: 'user',
-    content: messageText,
-    timestamp: Date.now(),
-    ...(images.length ? { images } : {}),
-  }
-
-  conv.messages.push(userMsg)
-  conv.updatedAt = Date.now()
-
-  if (conv.messages.filter(m => m.role === 'user').length === 1) {
-    conv.title = text.length > UI.titleTruncateLength
-      ? text.slice(0, UI.titleTruncateLength) + '…'
-      : text
-  }
-
-  el['messages-list'].appendChild(await renderMessage(userMsg))
-  el['message-input'].value = ''
-  el['message-input'].style.height = 'auto'
-  scrollToBottom()
-
-  const currentProvider = getProviderConfig(state.provider)?.label || ''
-  el['messages-list'].appendChild(renderTypingIndicator(currentProvider))
-  scrollToBottom()
-
-  const aiMsgId = `msg_${Date.now() + 1}`
-  const aiMsgEl = renderStreamingMessage(aiMsgId)
-  removeTypingIndicator()
-  el['messages-list'].appendChild(aiMsgEl)
-  scrollToBottom()
-
-  let fullReasoning = ''
-  let fullResponse = ''
-  abortController = new AbortController()
+  const mensajesApi = conv.messages.map(m => ({ role: m.role, content: m.content }))
 
   try {
-    const messagesForApi = conv.messages.map(m => ({
-      role: m.role,
-      content: m.content,
-      ...(m.images?.length ? { images: m.images } : {}),
-    }))
-
-    for await (const chunk of streamChat(messagesForApi, {
-      provider: state.provider,
-      signal: abortController.signal,
-      thinking: state.thinking,
+    for await (const evento of dialogar(mensajesApi, {
+      modelo: estado.modelo,
+      signal: abortador.signal,
+      k: estado.k,
     })) {
-      if (chunk.type === 'reasoning') {
-        if (!fullReasoning && chunk.text) showStreamingReasoning(aiMsgId)
-        fullReasoning += chunk.text
-        updateStreamingReasoning(aiMsgId, fullReasoning)
-      } else {
-        fullResponse += chunk.text
-        updateStreamingContent(aiMsgId, fullResponse)
+      if (evento.tipo === 'fuentes') {
+        fuentes = evento.fuentes
+        pintarFuentes(fila, fuentes)
+      } else if (evento.tipo === 'razonamiento') {
+        razonamiento += evento.texto
+        pintarRazonamiento(fila, razonamiento)
+      } else if (evento.tipo === 'texto') {
+        if (!acumulado) escribirEscribiendo(fila, false)
+        acumulado += evento.texto
+        programarPintado()
       }
-      scrollToBottom()
     }
-
-    if (fullReasoning) finalizeStreamingReasoning(aiMsgId, fullReasoning)
-    await finalizeStreamingContent(aiMsgId, fullResponse)
-
-    const aiMsg = {
-      id: aiMsgId,
-      role: 'assistant',
-      content: fullResponse,
-      ...(fullReasoning ? { reasoning: fullReasoning } : {}),
-      timestamp: Date.now(),
-      provider: state.provider,
-    }
-    conv.messages.push(aiMsg)
-    conv.updatedAt = Date.now()
-    saveState()
-    renderConversationList()
   } catch (err) {
     if (err.name === 'AbortError') {
-      if (fullResponse) {
-        if (fullReasoning) finalizeStreamingReasoning(aiMsgId, fullReasoning)
-        await finalizeStreamingContent(aiMsgId, fullResponse)
-        conv.messages.push({
-          id: aiMsgId,
-          role: 'assistant',
-          content: fullResponse + '\n\n*(generación detenida)*',
-          ...(fullReasoning ? { reasoning: fullReasoning } : {}),
-          timestamp: Date.now(),
-          provider: state.provider,
-        })
-        saveState()
-        renderConversationList()
-      }
+      acumulado = acumulado || ''
     } else {
-      console.error('Error:', err)
-      await finalizeStreamingContent(aiMsgId, `*Error al conectar con la API:* ${err.message}`)
-      showToast('Error de conexión. Revisa tu API key.')
+      console.error(err)
+      acumulado += acumulado ? `\n\n**Error:** ${err.message}` : `**No se pudo obtener respuesta.** ${err.message}`
+      mostrarAviso(err.message)
     }
   } finally {
-    state.sending = false
-    el['send-btn'].disabled = false
-    el['send-btn'].classList.remove('sending')
-    el['message-input'].disabled = false
-    el['message-input'].focus()
-    abortController = null
+    generando = false
+    abortador = null
+    ponerBotonEnviar()
+    bloqueosDeEntrada(false)
+    if (pendiente) await pintarTexto(fila, acumulado, false)
+    else await pintarTexto(fila, acumulado, false)
+    if (razonamiento) pintarRazonamiento(fila, razonamiento)
+    if (fuentes.length) pintarFuentes(fila, fuentes)
   }
+
+  const msgBot = {
+    id: idBot,
+    role: 'assistant',
+    content: acumulado,
+    modelo: estado.modelo,
+    modeloLabel: cfg?.label,
+    timestamp: Date.now(),
+    ...(razonamiento ? { reasoning: razonamiento } : {}),
+    ...(fuentes.length ? { sources: fuentes } : {}),
+  }
+  conv.messages.push(msgBot)
+  conv.updatedAt = Date.now()
+  guardarEstado()
+  pintarLista()
+  fila.dataset.id = idBot
+  if (cercaDelFondo(el.contenedor)) bajar()
 }
 
-const TEXT_EXTENSIONS = new Set([
-  'txt','js','py','ts','jsx','tsx','css','scss','html','json','xml','yaml','yml',
-  'toml','md','csv','log','sh','bash','zsh','env','gitignore','dockerfile','Dockerfile',
-  'conf','ini','cfg','sql','rb','go','rs','java','cpp','c','h','hpp','php','swift',
-  'kt','kts','scala','r','pl','lua','elixir','ex','exs','erl','hrl','clj','cljs',
-  'groovy','gradle','makefile','Makefile','cmake','ps1','bat','cmd','vue','svelte',
-  'astro','tex','rst','org','m','mm','f','f90','f95','f03','s','asm','prisma',
-  'graphql','gql','proto','svg','tf','tfvars','hcl','lock','zig','nim','raku',
-  'typ','tsv','properties','cfg','desktop','service','rules','patch','diff',
-])
+async function regenerar(fila) {
+  if (generando || !convActual) return
+  const id = fila.dataset.id
+  const indice = convActual.messages.findIndex(m => m.id === id)
+  if (indice === -1) return
 
-const IMAGE_EXTENSIONS = new Set(['jpg','jpeg','png','gif','webp','bmp','avif'])
-
-function classifyFile(file) {
-  const ext = file.name.split('.').pop()?.toLowerCase()
-  if (!ext) return file.type.startsWith('text/') ? 'text' : null
-  if (TEXT_EXTENSIONS.has(ext) || TEXT_EXTENSIONS.has(file.name)) return 'text'
-  if (IMAGE_EXTENSIONS.has(ext)) return 'image'
-  if (file.type.startsWith('text/')) return 'text'
-  if (file.type.startsWith('image/') && !file.type.includes('svg')) return 'image'
-  return null
+  convActual.messages = convActual.messages.slice(0, indice)
+  await pintarMensajes()
+  await generar(convActual)
 }
 
-async function handleFileSelect(files) {
-  for (const file of files) {
-    if (currentFiles.length >= 5) {
-      showToast('Máximo 5 archivos')
-      break
-    }
+const TEXTOS = new Set(['txt', 'md', 'json', 'csv', 'log', 'yml', 'yaml', 'xml', 'html', 'css', 'js', 'ts', 'jsx', 'tsx', 'py', 'java', 'c', 'h', 'cpp', 'go', 'rs', 'rb', 'php', 'sql', 'sh', 'rs', 'kt', 'swift', 'toml', 'ini', 'conf', 'env'])
 
-    if (file.size > 2 * 1024 * 1024) {
-      showToast(`"${file.name}" excede 2 MB`)
+async function adjuntarArchivos(lista) {
+  for (const archivo of lista) {
+    if (adjuntos.length >= 4) { mostrarAviso('Maximo 4 archivos'); break }
+    if (archivo.size > 1024 * 1024) { mostrarAviso(`"${archivo.name}" pasa de 1 MB`); continue }
+    const ext = archivo.name.split('.').pop()?.toLowerCase() || ''
+    if (!TEXTOS.has(ext) && !archivo.type.startsWith('text/')) {
+      mostrarAviso(`"${archivo.name}" no es texto plano`)
       continue
     }
-
-    const type = classifyFile(file)
-    if (!type) {
-      showToast(`"${file.name}" no es compatible`)
-      continue
-    }
-
     try {
-      if (type === 'image') {
-        const base64 = await fileToBase64(file)
-        const mime = file.type || 'image/png'
-        currentFiles.push({ type: 'image', name: file.name, base64, mime })
-      } else {
-        const text = await file.text()
-        currentFiles.push({ type: 'text', name: file.name, content: text })
-      }
+      adjuntos.push({ nombre: archivo.name, contenido: await archivo.text() })
     } catch {
-      showToast(`No se pudo leer "${file.name}"`)
+      mostrarAviso(`No se pudo leer "${archivo.name}"`)
     }
   }
-  renderFileList()
-  el['message-input']?.focus()
+  pintarAdjuntos()
+  bloqueosDeEntrada(false)
 }
 
-function renderFileList() {
-  if (!el['file-list']) return
-  if (currentFiles.length === 0) {
-    el['file-list'].innerHTML = ''
-    el['file-list'].hidden = true
+function pintarAdjuntos() {
+  const cont = el.chips
+  if (!cont) return
+  cont.hidden = adjuntos.length === 0
+  cont.innerHTML = adjuntos.map((a, i) => {
+    const ext = a.nombre.split('.').pop()?.toUpperCase() || 'TXT'
+    return `<span class="chip">
+      <span class="chip-ext">${escapeHtml(ext)}</span>
+      <span class="chip-nombre">${escapeHtml(a.nombre)}</span>
+      <button class="chip-quitar" type="button" data-quitar="${i}" aria-label="Quitar ${escapeHtml(a.nombre)}">&times;</button>
+    </span>`
+  }).join('')
+}
+
+/* ------------------------------------------------------------------ */
+/* Tema y ajustes                                                      */
+/* ------------------------------------------------------------------ */
+
+function aplicarTema(tema) {
+  estado.theme = tema
+  document.documentElement.setAttribute('data-theme', tema)
+  const meta = $('#theme-color-meta')
+  if (meta) meta.content = tema === 'dark' ? '#0E1F1B' : '#F6EEE8'
+  $$('.opcion-tema').forEach(b => {
+    const activo = b.dataset.tema === tema
+    b.setAttribute('aria-pressed', activo)
+    b.style.borderColor = activo ? 'var(--acento)' : 'var(--linea)'
+    b.style.color = activo ? 'var(--acento)' : 'var(--fg-suave)'
+    b.style.background = activo ? 'color-mix(in srgb, var(--acento) 12%, transparent)' : 'transparent'
+  })
+  guardarEstado()
+}
+
+function abrirModal(modal) {
+  if (!modal) return
+  modal.classList.remove('hidden')
+  modal.classList.add('flex')
+}
+function cerrarModal(modal) {
+  if (!modal) return
+  modal.classList.add('hidden')
+  modal.classList.remove('flex')
+}
+
+function pintarInfoModelo() {
+  const cont = el.infoModelo
+  if (!cont) return
+  const m = getModelo(estado.modelo)
+  const hayClave = Boolean(m?.apiKey)
+  cont.innerHTML = `
+    <div class="flex items-center gap-2">
+      <span class="text-[13px] font-semibold">${escapeHtml(m?.label || IDENTIDAD.nombre)}</span>
+      <span class="sello-gratis">${escapeHtml(m?.sello || 'Documental')}</span>
+    </div>
+    <p class="mt-1 text-[12px]" style="color:var(--fg-suave)">${escapeHtml(m?.descripcion || '')}</p>
+    <p class="mt-1.5 text-[11px]" style="color:var(--fg-suave)">${IDENTIDAD.modelo} · documentos indexados en el servidor${hayClave ? ' · clave propia configurada' : ''}</p>`
+}
+
+/* ------------------------------------------------------------------ */
+/* Exportar                                                            */
+/* ------------------------------------------------------------------ */
+
+function exportar(formato) {
+  if (!convActual?.messages.length) { mostrarAviso('No hay nada que exportar'); return }
+  const nombre = slug(convActual.title)
+
+  if (formato === 'json') {
+    descargar(`${nombre}.json`, JSON.stringify({
+      titulo: convActual.title,
+      modelo: MODELOS[convActual.modelo]?.label || IDENTIDAD.nombre,
+      creada: new Date(convActual.createdAt).toISOString(),
+      mensajes: convActual.messages.map(m => ({ rol: m.role, contenido: m.content, fuentes: m.sources || [] })),
+    }, null, 2), 'application/json')
     return
   }
 
-  el['file-list'].hidden = false
-  el['file-list'].innerHTML = currentFiles.map((f, i) =>
-    `<span class="file-chip ${f.type === 'image' ? 'file-chip-image' : ''}" title="${escapeHtml(f.name)}">
-      ${f.type === 'image'
-        ? `<img src="data:${f.mime};base64,${f.base64}" class="file-chip-preview" alt="" />`
-        : `<span class="file-chip-icon">${f.name.split('.').pop()}</span>`
-      }
-      <span class="file-chip-name">${escapeHtml(f.name)}</span>
-      <button class="file-chip-remove" data-index="${i}" aria-label="Quitar ${escapeHtml(f.name)}">&times;</button>
-    </span>`
-  ).join('')
+  const lineas = [
+    `# ${convActual.title}`,
+    '',
+    `_${IDENTIDAD.nombre} · ${MODELOS[convActual.modelo]?.label || ''} · ${new Date(convActual.createdAt).toLocaleString('es-CO')}_`,
+    '',
+  ]
+  convActual.messages.forEach(m => {
+    lineas.push(`## ${m.role === 'user' ? 'Usuario' : IDENTIDAD.nombre}`, '', m.content, '')
+    if (m.sources?.length) {
+      lineas.push('**Fuentes**', '')
+      m.sources.forEach(f => lineas.push(`- [${f.nombre}](${f.url || '#'})${f.score != null ? ` · ${f.score.toFixed(2)}` : ''}`))
+      lineas.push('')
+    }
+  })
+  descargar(`${nombre}.md`, lineas.join('\n'))
+}
 
-  el['file-list'].querySelectorAll('.file-chip-remove').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const idx = parseInt(btn.dataset.index)
-      if (!isNaN(idx)) {
-        currentFiles.splice(idx, 1)
-        renderFileList()
-      }
+/* ------------------------------------------------------------------ */
+/* Eventos                                                             */
+/* ------------------------------------------------------------------ */
+
+function cerrarMenu() {
+  el.velo?.classList.add('hidden')
+  document.body.classList.remove('sidebar-open')
+}
+
+function abrirFuente(bloque, abrir) {
+  const toggle = bloque?.querySelector('[data-accion="ver-fuente"]')
+  const texto = bloque?.querySelector('.fuente-texto')
+  if (!toggle || !texto) return
+  toggle.setAttribute('aria-expanded', String(abrir))
+  texto.hidden = !abrir
+}
+
+function alClicMensajes(ev) {
+  const accion = ev.target.closest('[data-accion]')?.dataset.accion
+  const fila = ev.target.closest('.msg-row')
+
+  if (accion === 'copiar-codigo') {
+    const btn = ev.target.closest('[data-accion]')
+    const codigo = btn.closest('.code-wrap')?.querySelector('code')?.textContent || ''
+    copiar(codigo).then(ok => {
+      if (!ok) return
+      btn.classList.add('hecho')
+      btn.innerHTML = '<span>Copiado</span>'
+      setTimeout(() => { btn.classList.remove('hecho'); btn.innerHTML = `${ICONO_COPIAR_MINI}<span>Copiar</span>` }, 1600)
     })
-  })
-}
+    return
+  }
 
-function loadSettingsIntoUI() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEYS.SETTINGS) || '{}')
-    if (el.settingsInputs.openrouter) el.settingsInputs.openrouter.value = saved.openrouter?.apiKey || ''
-    if (el.settingsInputs.gemini) el.settingsInputs.gemini.value = saved.gemini?.apiKey || ''
-    if (el.settingsInputs.pro) el.settingsInputs.pro.value = saved.pro?.apiKey || ''
-  } catch { /* use env defaults */ }
-  updateSettingsProviderInfo()
-}
+  if (ev.target.classList.contains('cita')) {
+    const fuente = fila.querySelector(`[data-fuente="${ev.target.dataset.cita}"]`)
+    if (!fuente) return
+    abrirFuente(fuente, true)
+    fuente.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    fuente.animate(
+      [{ background: 'color-mix(in srgb, var(--acento) 28%, transparent)' }, { background: 'transparent' }],
+      { duration: 1400, easing: 'ease-out' }
+    )
+    return
+  }
 
-function updateSettingsProviderInfo() {
-  const prov = getProviderConfig(state.provider)
-  const info = el['settings-provider-info']
-  if (!info) return
-  if (prov) {
-    const isFree = prov.mode === 'free'
-    info.innerHTML = `
-      <div class="flex items-center gap-2 mb-1">
-        <span class="text-sm font-semibold">${escapeHtml(prov.label)}</span>
-        <span class="text-[10px] px-1.5 py-0.5 rounded-md font-semibold ${isFree ? 'bg-green-500/10 text-green-400' : 'bg-gold/10 text-gold'}">${isFree ? 'Gratuito' : 'PRO'}</span>
-      </div>
-      <div class="flex items-center gap-3 text-xs text-surface-300">
-        <span>Tema: ${state.theme === 'dark' ? 'oscuro' : 'claro'}</span>
-        <span>·</span>
-        <span>Modelos: ${getAllProviders().length} disp.</span>
-      </div>`
-  } else {
-    info.innerHTML = '<span class="text-xs text-surface-300">Ningún proveedor seleccionado</span>'
+  if (accion === 'ver-fuente') {
+    const toggle = ev.target.closest('[data-accion]')
+    const bloque = toggle.closest('.fuente')
+    abrirFuente(bloque, toggle.getAttribute('aria-expanded') !== 'true')
+    return
+  }
+
+  if (!fila) return
+
+  if (accion === 'copiar') {
+    const btn = ev.target.closest('[data-accion]')
+    copiar(textoDeMensaje(fila)).then(ok => {
+      if (!ok) return
+      btn.classList.add('hecho')
+      const original = btn.innerHTML
+      btn.innerHTML = '<span>Copiado</span>'
+      setTimeout(() => { btn.classList.remove('hecho'); btn.innerHTML = original }, 1500)
+    })
+    return
+  }
+
+  if (accion === 'regenerar') {
+    regenerar(fila)
+    return
+  }
+
+  if (accion === 'editar') {
+    if (generando) return
+    const id = fila.dataset.id
+    const idx = convActual.messages.findIndex(m => m.id === id)
+    if (idx === -1) return
+    const actual = convActual.messages[idx].content
+    const nuevo = prompt('Edita tu mensaje', actual)
+    if (nuevo == null || !nuevo.trim() || nuevo === actual) return
+    convActual.messages = convActual.messages.slice(0, idx)
+    el.input.value = nuevo.trim()
+    el.input.dispatchEvent(new Event('input'))
+    el.input.focus()
   }
 }
 
-function initProviders() {
-  const all = getAllProviders()
-  if (!state.provider || !all.find(p => p.id === state.provider)) {
-    state.provider = all.find(p => p.mode === 'free')?.id || all[0]?.id || null
+const ICONO_COPIAR_MINI = '<svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 10H2a1 1 0 01-1-1V2a1 1 0 011-1h7a1 1 0 011 1v1M5 13h7a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v7a1 1 0 001 1z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+
+function atajos(ev) {
+  const escribiendo = ['INPUT', 'TEXTAREA'].includes(ev.target.tagName)
+
+  if (ev.key === 'Escape') {
+    if (generando) { abortador?.abort(); return }
+    cerrarModal(el.modalAjustes)
+    cerrarMenu()
+    return
+  }
+
+  if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'k') {
+    ev.preventDefault()
+    el.buscar?.focus()
+    return
+  }
+
+  if ((ev.ctrlKey || ev.metaKey) && ev.shiftKey && ev.key.toLowerCase() === 'o') {
+    ev.preventDefault()
+    nuevaConversacion()
+    el.input?.focus()
+    return
+  }
+
+  if (ev.key === '/' && !escribiendo) {
+    ev.preventDefault()
+    el.input?.focus()
   }
 }
 
-function updateThinkingSwitch() {
-  const isActive = state.thinking
-  const tracks = [el['thinking-track'], el['settings-thinking-track']]
-  tracks.forEach(track => {
-    if (!track) return
-    track.classList.toggle('active', isActive)
-  })
+/* ------------------------------------------------------------------ */
+/* Arranque                                                            */
+/* ------------------------------------------------------------------ */
 
-  const labels = [el['thinking-label-text'], el['settings-thinking-label']]
-  labels.forEach(label => {
-    if (!label) return
-    label.textContent = isActive ? 'Thinking' : 'No thinking'
-    label.classList.toggle('active', isActive)
-  })
+function cachear() {
+  const ids = [
+    'sidebar', 'velo', 'menu-btn', 'contenedor', 'mensajes', 'vacio',
+    'input', 'enviar', 'adjuntar', 'archivos', 'chips', 'lista', 'buscar',
+    'modelo-label', 'modelo-sello',
+    'modal-ajustes', 'btn-ajustes', 'cerrar-ajustes',
+    'info-modelo',
+    'nueva-conv', 'ir-abajo', 'exportar-md', 'exportar-json',
+    'clave-reprebot',
+    'guardar-ajustes', 'k-fuentes', 'k-valor', 'limpiar-datos', 'sugerencias',
+    'cerrar-sidebar',
+  ]
+  ids.forEach(id => { el[camel(id)] = document.getElementById(id) })
 }
 
-function bindThinkingSwitch(trackEl) {
-  if (!trackEl) return
-  trackEl.addEventListener('click', (e) => {
-    e.stopPropagation()
-    state.thinking = !state.thinking
-    updateThinkingSwitch()
-    saveState()
-  })
+function camel(id) {
+  return id.replace(/-([a-z])/g, (_, c) => c.toUpperCase())
 }
 
-function setupScrollBottomBtn() {
-  const container = el['messages-container']
-  const btn = el['scroll-bottom-btn']
-  if (!container || !btn) return
+function pintarSugerencias() {
+  const cont = el.sugerencias
+  if (!cont) return
+  cont.innerHTML = SUGERENCIAS.map(s => `<button class="sugerencia" type="button" data-prompt="${escapeHtml(s.texto)}">
+    <span>${escapeHtml(s.titulo)}</span>
+    <span class="sugerencia-texto">${escapeHtml(s.texto)}</span>
+  </button>`).join('')
+}
 
-  let ticking = false
-  container.addEventListener('scroll', () => {
-    if (!ticking) {
-      requestAnimationFrame(() => {
-        const threshold = container.scrollHeight - container.clientHeight - 300
-        btn.classList.toggle('visible', container.scrollTop < threshold)
-        ticking = false
-      })
-      ticking = true
+async function arrancar() {
+  cachear()
+  cargarEstado()
+  pintarSugerencias()
+  pintarAdjuntos()
+
+  await initRenderer()
+
+  aplicarTema(estado.theme)
+  pintarSwitchThinking()
+  pintarMenuModelos()
+  pintarEtiquetaModelo()
+  pintarLista()
+  await pintarMensajes()
+
+  if (!convActual) nuevaConversacion()
+
+  // --- compositor ---
+  el.input.addEventListener('input', () => {
+    el.input.style.height = 'auto'
+    el.input.style.height = Math.min(el.input.scrollHeight, UI.maxInputHeight) + 'px'
+    bloqueosDeEntrada(false)
+  })
+
+  el.input.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter' && !ev.shiftKey) {
+      ev.preventDefault()
+      if (!generando && (el.input.value.trim() || adjuntos.length)) enviarTexto()
+    }
+    if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) {
+      ev.preventDefault()
+      enviarTexto()
     }
   })
 
-  btn.addEventListener('click', scrollToBottom)
+  el.enviar.addEventListener('click', () => {
+    if (generando) abortador?.abort()
+    else enviarTexto()
+  })
+
+  el.adjuntar?.addEventListener('click', () => el.archivos.click())
+  el.archivos?.addEventListener('change', () => {
+    if (el.archivos.files?.length) adjuntarArchivos(el.archivos.files)
+    el.archivos.value = ''
+  })
+
+  el.chips?.addEventListener('click', ev => {
+    const idx = ev.target.dataset.quitar
+    if (idx == null) return
+    adjuntos.splice(Number(idx), 1)
+    pintarAdjuntos()
+    bloqueosDeEntrada(false)
+  })
+
+  // --- sugerencias ---
+  el.sugerencias?.addEventListener('click', ev => {
+    const btn = ev.target.closest('[data-prompt]')
+    if (!btn) return
+    enviarTexto(btn.dataset.prompt)
+  })
+
+  // --- modelos ---
+  el.modeloBtn?.addEventListener('click', ev => {
+    ev.stopPropagation()
+    alternarMenuModelos()
+  })
+
+  el.menuModelos?.addEventListener('click', ev => {
+    const btn = ev.target.closest('[data-modelo]')
+    if (!btn) return
+    elegirModelo(btn.dataset.modelo)
+    el.menuModelos.classList.add('hidden')
+  })
+
+  document.addEventListener('click', ev => {
+    if (!ev.target.closest('#menu-modelos') && !ev.target.closest('#modelo-btn')) {
+      el.menuModelos?.classList.add('hidden')
+      el.modeloBtn?.setAttribute('aria-expanded', 'false')
+    }
+  })
+
+  // --- thinking ---
+  el.thinkingTrack?.addEventListener('click', alternarThinking)
+  el.ajustesThinkingTrack?.addEventListener('click', alternarThinking)
+
+  // --- sidebar ---
+  el.menuBtn?.addEventListener('click', () => {
+    el.velo.classList.remove('hidden')
+    document.body.classList.add('sidebar-open')
+  })
+
+  el.cerrarSidebar?.addEventListener('click', cerrarMenu)
+
+  el.velo?.addEventListener('click', cerrarMenu)
+  el.nuevaConv?.addEventListener('click', () => { nuevaConversacion(); cerrarMenu() })
+
+  el.lista?.addEventListener('click', ev => {
+    const borrar = ev.target.closest('[data-accion="borrar-conv"]')
+    if (borrar) { borrarConversacion(borrar.closest('.conv-item').dataset.id, ev); return }
+    const item = ev.target.closest('.conv-item')
+    if (item) abrirConversacion(item.dataset.id)
+  })
+
+  el.lista?.addEventListener('dblclick', ev => {
+    const item = ev.target.closest('.conv-item')
+    if (item) renombrarConversacion(item.dataset.id)
+  })
+
+  el.buscar?.addEventListener('input', pintarLista)
+
+  // --- mensajes ---
+  el.mensajes.addEventListener('click', alClicMensajes)
+
+  // --- ajustes ---
+  el.btnAjustes?.addEventListener('click', () => {
+    cerrarMenu()
+    const ajustes = leerAjustes()
+    el.claveReprebot.value = ajustes.reprebot?.apiKey || ''
+    el.claveOpenrouter.value = ajustes.openrouter?.apiKey || ''
+    el.claveGemini.value = ajustes.gemini?.apiKey || ''
+    el.clavePro.value = ajustes.pro?.apiKey || ''
+    el.kFuentes.value = estado.k
+    el.kValor.textContent = estado.k
+    pintarInfoModelo()
+    abrirModal(el.modalAjustes)
+  })
+
+  el.cerrarAjustes?.addEventListener('click', () => cerrarModal(el.modalAjustes))
+
+  el.kFuentes?.addEventListener('input', () => {
+    estado.k = Number(el.kFuentes.value)
+    el.kValor.textContent = el.kFuentes.value
+    guardarEstado()
+  })
+
+  el.guardarAjustes?.addEventListener('click', () => {
+    const payload = {
+      reprebot: { apiKey: el.claveReprebot.value.trim() },
+      openrouter: { apiKey: el.claveOpenrouter.value.trim() },
+      gemini: { apiKey: el.claveGemini.value.trim() },
+      pro: { apiKey: el.clavePro.value.trim() },
+    }
+    setSettingsOverrides(payload)
+    guardarAjustes(payload)
+    guardarEstado()
+    pintarInfoModelo()
+    pintarMenuModelos()
+
+    const btn = el.guardarAjustes
+    const original = btn.textContent
+    btn.textContent = 'Guardado'
+    btn.disabled = true
+    setTimeout(() => { btn.textContent = original; btn.disabled = false }, 1400)
+  })
+
+  el.limpiarDatos?.addEventListener('click', () => {
+    if (!confirm('Esto borra todas las conversaciones y claves de este navegador. ¿Seguir?')) return
+    localStorage.removeItem(STORAGE_KEYS.STATE)
+    localStorage.removeItem(STORAGE_KEYS.SETTINGS)
+    location.reload()
+  })
+
+  // --- modales por fuera ---
+  $$('.modal-overlay').forEach(modal => {
+    modal.addEventListener('click', ev => {
+      if (ev.target === modal || ev.target.classList.contains('modal-backdrop')) cerrarModal(modal)
+    })
+  })
+
+  // --- tema ---
+  $$('.opcion-tema').forEach(b => b.addEventListener('click', () => aplicarTema(b.dataset.tema)))
+
+  // --- exportar ---
+  el.exportarMd?.addEventListener('click', () => exportar('md'))
+  el.exportarJson?.addEventListener('click', () => exportar('json'))
+
+  // --- ir abajo ---
+  el.contenedor.addEventListener('scroll', () => {
+    const mostrar = !cercaDelFondo(el.contenedor, 320)
+    el.irAbajo?.classList.toggle('visible', mostrar)
+  }, { passive: true })
+  el.irAbajo?.addEventListener('click', () => bajar(true))
+
+  document.addEventListener('keydown', atajos)
+
+  const guardado = leerAjustes()
+  setSettingsOverrides(guardado)
+  pintarInfoModelo()
+  pintarEtiquetaModelo()
+  pintarMenuModelos()
+
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {})
 }
 
 export function bootstrap() {
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => setTimeout(start, 0))
+    document.addEventListener('DOMContentLoaded', () => setTimeout(arrancar, 0))
   } else {
-    setTimeout(start, 0)
-  }
-}
-
-async function start() {
-  loadState()
-  cacheElements()
-  initProviders()
-
-  setupMessageInteractions(el['messages-list'])
-
-  // --- Provider dropdown (fixed positioning) ---
-  if (el['provider-selector']) {
-    el['provider-selector'].addEventListener('click', e => {
-      e.stopPropagation()
-      const dd = el['provider-dropdown']
-      if (!dd) return
-      if (dd.classList.contains('hidden')) {
-        const rect = el['provider-selector'].getBoundingClientRect()
-        dd.style.position = 'fixed'
-        dd.style.top = (rect.bottom + 4) + 'px'
-        dd.style.left = rect.left + 'px'
-        dd.style.minWidth = Math.max(rect.width, 220) + 'px'
-      }
-      dd.classList.toggle('hidden')
-    })
-  }
-
-  document.addEventListener('click', () => {
-    if (el['provider-dropdown']) el['provider-dropdown'].classList.add('hidden')
-  })
-
-  // --- Theme toggle ---
-  if (el['theme-btn']) {
-    el['theme-btn'].addEventListener('click', () => {
-      applyTheme(state.theme === 'dark' ? 'light' : 'dark')
-      updateSettingsThemeBtns()
-    })
-  }
-
-  // --- Sidebar ---
-  if (el['menu-btn']) el['menu-btn'].addEventListener('click', toggleSidebar)
-  if (el['sidebar-overlay']) el['sidebar-overlay'].addEventListener('click', closeSidebar)
-
-  // --- Settings ---
-  if (el['settings-btn']) {
-    el['settings-btn'].addEventListener('click', () => {
-      closeSidebar()
-      loadSettingsIntoUI()
-      showModal(el['settings-modal'])
-    })
-  }
-
-  if (el['settings-close']) {
-    el['settings-close'].addEventListener('click', () => {
-      hideModal(el['settings-modal'])
-    })
-  }
-
-  if (el['settings-save']) {
-    el['settings-save'].addEventListener('click', () => {
-      const overrides = {
-        openrouter: { apiKey: el.settingsInputs.openrouter?.value.trim() || '' },
-        gemini: { apiKey: el.settingsInputs.gemini?.value.trim() || '' },
-        pro: { apiKey: el.settingsInputs.pro?.value.trim() || '' },
-      }
-
-      setSettingsOverrides(overrides)
-      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(overrides))
-      hideModal(el['settings-modal'])
-
-      const btn = el['settings-save']
-      const original = btn.textContent
-      btn.textContent = '✓ Guardado'
-      btn.style.pointerEvents = 'none'
-      setTimeout(() => {
-        btn.textContent = original
-        btn.style.pointerEvents = ''
-      }, 1500)
-    })
-  }
-
-  // --- Settings theme options ---
-  const themeDark = $('#settings-theme-dark')
-  const themeLight = $('#settings-theme-light')
-  function updateSettingsThemeBtns() {
-    const active = state.theme
-    ;[themeDark, themeLight].forEach(btn => {
-      if (!btn) return
-      const isActive = btn.dataset.themeOption === active
-      btn.setAttribute('data-active', isActive ? '' : null)
-      btn.className = `theme-option flex-1 flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-sm font-medium border transition-all duration-200 ${
-        isActive
-          ? 'bg-gold/10 border-gold text-gold'
-          : 'bg-surface-500 border-surface-700 text-surface-200 hover:bg-gold/10 hover:border-gold/30'
-      }`
-    })
-  }
-  ;[themeDark, themeLight].forEach(btn => {
-    btn?.addEventListener('click', () => {
-      applyTheme(btn.dataset.themeOption)
-      updateSettingsThemeBtns()
-    })
-  })
-  updateSettingsThemeBtns()
-
-  // --- Thinking toggle (iOS switch) ---
-  updateThinkingSwitch()
-  bindThinkingSwitch(el['thinking-track'])
-  bindThinkingSwitch(el['settings-thinking-track'])
-
-  // --- Modal backdrop clicks ---
-  $$('.modal-overlay').forEach(modal => {
-    modal.addEventListener('click', e => {
-      if (e.target === modal || e.target.classList.contains('modal-backdrop')) {
-        hideModal(modal)
-      }
-    })
-  })
-
-  // --- Message input ---
-  if (el['message-input']) {
-    el['message-input'].addEventListener('input', () => {
-      el['message-input'].style.height = 'auto'
-      el['message-input'].style.height = Math.min(el['message-input'].scrollHeight, UI.maxInputHeight) + 'px'
-      if (el['send-btn']) {
-        const hasText = el['message-input'].value.trim().length > 0
-        el['send-btn'].disabled = (!hasText && currentFiles.length === 0) || state.sending
-      }
-    })
-
-    el['message-input'].addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault()
-        if (el['send-btn'] && !el['send-btn'].disabled) sendMessage()
-      }
-    })
-  }
-
-  if (el['send-btn']) {
-    el['send-btn'].addEventListener('click', sendMessage)
-  }
-
-  // --- Escape key closes modals ---
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') {
-      if (!el['settings-modal']?.classList.contains('hidden')) {
-        hideModal(el['settings-modal'])
-      }
-      if (!el['cost-modal']?.classList.contains('hidden')) {
-        hideModal(el['cost-modal'])
-      }
-    }
-  })
-
-  // --- Suggestion chips ---
-  el.suggestionChips.forEach(chip => {
-    chip.addEventListener('click', () => {
-      if (el['message-input']) {
-        el['message-input'].value = chip.dataset.prompt
-        el['message-input'].dispatchEvent(new Event('input', { bubbles: true }))
-      }
-      el['message-input']?.focus()
-      sendMessage()
-    })
-  })
-
-  // --- New chat ---
-  if (el['new-chat-btn-side']) {
-    el['new-chat-btn-side'].addEventListener('click', () => {
-      createNewConversation()
-      closeSidebar()
-    })
-  }
-
-  // --- Keyboard shortcuts ---
-  document.addEventListener('keydown', e => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      sendMessage()
-    }
-    if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
-      e.preventDefault()
-      el['message-input']?.focus()
-    }
-  })
-
-  // --- File attach ---
-  if (el['attach-btn'] && el['file-input']) {
-    el['attach-btn'].addEventListener('click', () => {
-      el['file-input'].click()
-    })
-
-    el['file-input'].addEventListener('change', () => {
-      if (el['file-input'].files?.length) {
-        handleFileSelect(el['file-input'].files)
-        el['file-input'].value = ''
-      }
-    })
-  }
-
-  // --- Scroll to bottom button ---
-  setupScrollBottomBtn()
-
-  // --- Load settings overrides ---
-  try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEYS.SETTINGS) || '{}')
-    setSettingsOverrides(saved)
-    if (el.settingsInputs.openrouter) el.settingsInputs.openrouter.value = saved.openrouter?.apiKey || ''
-    if (el.settingsInputs.gemini) el.settingsInputs.gemini.value = saved.gemini?.apiKey || ''
-    if (el.settingsInputs.pro) el.settingsInputs.pro.value = saved.pro?.apiKey || ''
-  } catch { /* ignore */ }
-
-  // --- Init UI ---
-  applyTheme(state.theme)
-  buildDropdown()
-  updateProviderUI()
-  await initRenderer()
-
-  let conv = getCurrentConversation()
-  if (!conv && state.conversations.length === 0) {
-    createNewConversation()
-  } else if (!conv && state.conversations.length > 0) {
-    state.currentId = state.conversations[0].id
-  }
-
-  renderConversationList()
-  await renderMessages()
-
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(() => {})
+    setTimeout(arrancar, 0)
   }
 }
 

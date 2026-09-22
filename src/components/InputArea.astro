@@ -2,36 +2,53 @@
 
 ---
 
-<div id="input-area" class="shrink-0 px-3 pt-1.5 pb-[calc(6px+env(safe-area-inset-bottom,0px))] bg-surface border-t border-surface-800 relative lg:px-6 lg:pt-2 lg:pb-[calc(8px+env(safe-area-inset-bottom,0px))]">
-  <div class="flex items-center justify-between mb-1.5 px-1">
-    <button id="provider-selector" class="provider-btn flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium text-surface-200 hover:bg-gold/10 hover:text-gold transition-all duration-200" aria-label="Seleccionar modelo">
-      <span id="provider-label" class="font-medium">OpenRouter</span>
-      <span id="provider-badge" class="text-[10px] px-1.5 py-0.5 rounded-md font-semibold tracking-wide">—</span>
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
-    <label class="thinking-switch" id="thinking-label-wrap">
-      <div class="thinking-track" id="thinking-track">
-        <span class="thinking-thumb"></span>
+<div class="shrink-0 px-3 pb-[calc(.6rem+env(safe-area-inset-bottom,0px))] pt-2 lg:px-6">
+  <div class="mx-auto max-w-[52rem]">
+
+    <div id="chips" class="mb-2 flex flex-wrap gap-1.5 px-1" hidden></div>
+
+    <div class="mb-1.5 flex items-center gap-2 px-1">
+      <button id="modelo-btn" type="button"
+        class="flex min-w-0 shrink items-center gap-2 rounded-lg px-2 py-1 text-[11.5px] font-medium transition-colors hover:bg-[color:var(--card)]"
+        aria-haspopup="listbox" aria-expanded="false" aria-label="Elegir modelo">
+        <svg class="shrink-0" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true" style="color:var(--acento)">
+          <path d="M8 1.5l1.6 4.1 4.1 1.6-4.1 1.6L8 12.9l-1.6-4.1L2.3 7.2l4.1-1.6z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
+        </svg>
+        <span id="modelo-label" class="truncate font-semibold">Reprebot</span>
+        <span id="modelo-sello" class="hidden shrink-0 sello-gratis sm:inline">Documental</span>
+        <svg class="shrink-0" width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+
+      <div class="ml-auto flex shrink-0 items-center gap-2.5">
+        <label class="switch" title="Razonar antes de responder">
+          <span class="switch-track" id="thinking-track" data-on="true" role="switch" tabindex="0" aria-label="Modo razonamiento">
+            <span class="switch-thumb"></span>
+          </span>
+          <span class="switch-label hidden sm:inline" id="thinking-label" data-on="true">Razonamiento</span>
+        </label>
       </div>
-      <span class="thinking-label" id="thinking-label-text">Thinking</span>
-    </label>
+    </div>
+
+    <div class="composer">
+      <button id="adjuntar" type="button" class="icon-btn" aria-label="Adjuntar archivo de texto" title="Adjuntar archivo">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M12.5 7.5l-5 5a2 2 0 002.83 2.83l5.7-5.7a4 4 0 10-5.66-5.66L4.2 9.14a5 5 0 000 7.07" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <input id="archivos" type="file" class="hidden" multiple
+        accept=".txt,.md,.json,.csv,.log,.yml,.yaml,.xml,.html,.css,.js,.ts,.jsx,.tsx,.py,.java,.c,.h,.cpp,.go,.rs,.rb,.php,.sql,.sh,.kt,.swift,.toml,.ini,.conf,.env" />
+
+      <textarea id="input" rows="1" placeholder="Pregunta lo que necesites…"
+        class="max-h-[200px] flex-1 bg-transparent py-2 text-[15px] leading-relaxed outline-none placeholder:text-[color:var(--fg-suave)]"
+        aria-label="Mensaje"></textarea>
+
+      <button id="enviar" type="button" class="send-btn" aria-label="Enviar mensaje" disabled>
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M2.5 10L17 3.5 12 16l-2.6-4.6L2.5 10z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+
+    <p class="mt-1.5 select-none px-1 text-center text-[10.5px]" style="color:var(--fg-suave)">
+      Reprebot cita sus fuentes. Verifica lo crítico con la Secretaría de la Facultad.
+    </p>
   </div>
 
-  <div id="provider-dropdown" class="bg-surface-400 border border-surface-700 rounded-xl p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.8)] min-w-[200px] max-h-[60vh] overflow-y-auto z-[100] animate-dropdown-in origin-top-left hidden" role="listbox" aria-label="Modelos disponibles">
-    <div id="dropdown-free-group" class="py-0.5"></div>
-  </div>
-
-  <div id="file-list" class="flex flex-wrap gap-1.5 mb-2 px-1" hidden></div>
-
-  <div class="input-wrapper flex items-end gap-2 bg-surface-400 border border-surface-700 rounded-2xl px-4 py-1 transition-all duration-200 has-[:focus]:border-gold has-[:focus]:shadow-[0_0_0_2px_rgba(200,168,124,0.08)]">
-    <button id="attach-btn" class="w-9 h-9 rounded-xl flex items-center justify-center text-surface-300 hover:text-gold hover:bg-gold/10 shrink-0 transition-all duration-200 active:scale-95" aria-label="Adjuntar archivo" title="Adjuntar archivo o imagen">
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 5v6M7 8l3 3 3-3M6 14h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 11v4a2 2 0 002 2h8a2 2 0 002-2v-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
-    <input type="file" id="file-input" class="hidden" multiple accept=".txt,.js,.py,.ts,.jsx,.tsx,.css,.scss,.html,.json,.xml,.yaml,.yml,.toml,.md,.csv,.log,.sh,.bash,.env,.gitignore,.dockerfile,.conf,.ini,.cfg,.sql,.rb,.go,.rs,.java,.cpp,.c,.h,.hpp,.php,.swift,.kt,.kts,.scala,.r,.pl,.lua,.vue,.svelte,.astro,.tex,.rst,.org,.ps1,.bat,.cmd,.gradle,.makefile,.prisma,.graphql,.gql,.proto,.svg,.tf,.zig,.nim,.diff,.patch,.properties,.desktop,.service,.jpg,.jpeg,.png,.gif,.webp,.bmp,.avif" />
-    <textarea id="message-input" class="message-input flex-1 py-2.5 text-[15px] bg-transparent text-surface-100 max-h-[120px] leading-relaxed placeholder:text-surface-300" placeholder="Escribe un mensaje..." rows="1" aria-label="Mensaje"></textarea>
-    <button id="send-btn" class="send-btn w-9 h-9 rounded-xl flex items-center justify-center bg-gold text-surface shrink-0 transition-all duration-200 hover:bg-gold-50 hover:scale-105 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100" aria-label="Enviar mensaje" disabled>
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M2 10l16-7-7 16-3-6-6-3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
-    </button>
-  </div>
-  <p class="text-[10px] text-surface-300 text-center mt-1.5 select-none">Los modelos PRO pueden generar costos. Verifica siempre tus límites.</p>
+  <div id="menu-modelos" class="glass-strong fixed z-[120] hidden max-h-[70vh] w-[290px] overflow-y-auto rounded-2xl p-1.5 animate-dropdown-in" role="listbox" aria-label="Modelos"></div>
 </div>
