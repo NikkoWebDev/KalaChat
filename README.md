@@ -110,6 +110,38 @@ curl -s -m 60 -X POST https://api2.nikko.dev/v1/chat/completions \
 
 El OPTIONS debe devolver 200 con `access-control-allow-origin`.
 
+> **Ojo si `api2` solo reenvía a Render:** el RAG mantiene su propia allowlist y
+> responde `OPTIONS → 400` a orígenes no permitidos (p. ej. `repre.nikko.dev`).
+> En ese caso el CORS debe resolverlo `api2` en el borde: responder el `OPTIONS`
+> él mismo e inyectar `Access-Control-Allow-Origin` en las respuestas del POST.
+> Ejemplo nginx:
+>
+> ```nginx
+> location /v1/ {
+>   if ($request_method = OPTIONS) {
+>     add_header Access-Control-Allow-Origin *;
+>     add_header Access-Control-Allow-Headers "content-type, x-api-key";
+>     add_header Access-Control-Allow-Methods "GET, POST, OPTIONS";
+>     return 200;
+>   }
+>   proxy_pass https://reprebot-api.onrender.com;
+>   proxy_set_header Host reprebot-api.onrender.com;
+>   add_header Access-Control-Allow-Origin * always;
+>   add_header Access-Control-Allow-Headers "content-type, x-api-key" always;
+> }
+> ```
+>
+> Con Caddy basta un `handle_response`/`header` equivalente. Sin esto, el
+> navegador bloquea el directo y el chat depende del proxy `/api/reprebot`.
+
+### Diagnosticar el proxy `/api/reprebot`
+
+Abrir `GET https://TU-DOMINIO/api/reprebot` en el navegador:
+
+- **405 / "Method not allowed"** → la función está viva.
+- **404 o el HTML de la app** → no se desplegó (o un rewrite la tapa; en Vercel
+  el rewrite excluye `/api/*`). Redeploy y reintentar.
+
 ## Si falla con error de red
 
 El backend RAG vive en Render (plan gratuito): tras un rato sin uso se duerme y el

@@ -108,7 +108,10 @@ async function postProxy(body, apiKey, signal) {
     body: JSON.stringify(body),
     signal,
   })
-  if (res.status === 404 || res.status === 405) {
+  const content = res.headers.get('content-type') || ''
+  // Sin función desplegada (o rewrite que la tapa) el servidor devuelve
+  // la SPA (HTML) en vez del API: no hay proxy utilizable.
+  if (res.status === 404 || res.status === 405 || content.includes('text/html')) {
     const err = new Error('Proxy ausente en este entorno')
     err.code = 'SIN_PROXY'
     throw err
