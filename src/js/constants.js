@@ -89,4 +89,4 @@ export const API_KEYS_ENV = {
   groq: env.VITE_GROQ_API_KEY || '',
 }
 
-export const REPREBOT_BASE_URL = (env.VITE_REPREBOT_BASE_URL || 'https://reprebot-api.onrender.com').replace(/\/+$/, '')
+export const REPREBOT_BASE_URL = (env.VITE_REPREBOT_BASE_URL || 'https://api2.nikko.dev').replace(/\/+$/, '')

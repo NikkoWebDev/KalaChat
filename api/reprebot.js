@@ -8,7 +8,7 @@ export default async function handler(req, res) {
     return
   }
 
-  const base = (process.env.REPREBOT_BASE_URL || 'https://reprebot-api.onrender.com').replace(/\/+$/, '')
+  const base = (process.env.REPREBOT_BASE_URL || 'https://api2.nikko.dev').replace(/\/+$/, '')
   const headers = { 'Content-Type': 'application/json' }
   const apiKey = req.headers['x-api-key']
   if (apiKey) headers['X-Api-Key'] = apiKey

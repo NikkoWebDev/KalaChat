@@ -40,7 +40,7 @@ npm run preview  # sirve el build
 
 | Variable | Para qué |
 |---|---|
-| `VITE_REPREBOT_BASE_URL` | Endpoint RAG (por defecto `https://reprebot-api.onrender.com`). Sin clave funciona si el servidor tiene la suya. |
+| `VITE_REPREBOT_BASE_URL` | Endpoint RAG (por defecto `https://api2.nikko.dev`). Ver "Backend en api2.nikko.dev". |
 | `VITE_REPREBOT_API_KEY` | `X-Api-Key` opcional propia de Reprebot. |
 | `VITE_GROQ_BASE_URL` | Por defecto `https://api.groq.com/openai/v1`. |
 | `VITE_GROQ_API_KEY` | Clave de Groq (`gsk-…`). También se puede pegar en Ajustes (queda solo en el navegador). |
@@ -80,6 +80,36 @@ mvp/index.html                 # prototipo antiguo (sin claves reales)
 `Enter` enviar · `Shift+Enter` nueva línea · `Ctrl+Shift+O` nueva conversación ·
 `Ctrl+K` buscar · `/` enfocar compositor · `Esc` detener generación.
 
+## Backend en api2.nikko.dev
+
+El frontend apunta a `https://api2.nikko.dev` (directo primero, proxy `/api/reprebot`
+como respaldo). Para que responda, el subdominio debe cumplir esto:
+
+1. **DNS** — `api2.nikko.dev` resolviendo al servidor. ✅ (ya resuelve)
+2. **TLS** — certificado válido en el 443 (hoy falla el handshake). Con Caddy es
+   automático; con nginx + certbot: `certbot --nginx -d api2.nikko.dev`.
+3. **Reverse proxy** hacia el RAG (`https://reprebot-api.onrender.com`), ejemplo nginx:
+   `proxy_pass https://reprebot-api.onrender.com;` preservando `Host` del upstream.
+4. **CORS permisivo** (las peticiones no llevan credenciales, basta `*`):
+   `Access-Control-Allow-Origin: *`,
+   `Access-Control-Allow-Headers: content-type, x-api-key`,
+   `Access-Control-Allow-Methods: GET, POST, OPTIONS`, y responder el `OPTIONS`
+   con 200. Con esto el directo funciona desde cualquier origen y el proxy queda
+   de respaldo.
+
+Verificar cuando esté listo:
+
+```bash
+curl -s -m 20 -X OPTIONS https://api2.nikko.dev/v1/chat/completions \
+  -H "Origin: http://localhost:5173" \
+  -H "Access-Control-Request-Method: POST" -D - -o /dev/null
+curl -s -m 60 -X POST https://api2.nikko.dev/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"messages":[{"role":"user","content":"hola"}],"stream":false}' | head -c 200
+```
+
+El OPTIONS debe devolver 200 con `access-control-allow-origin`.
+
 ## Si falla con error de red
 
 El backend RAG vive en Render (plan gratuito): tras un rato sin uso se duerme y el
@@ -92,9 +122,11 @@ primer intento puede fallar con `NetworkError`. El chat lo detecta solo:
 
 ### CORS y el proxy `/api/reprebot`
 
-El backend tiene allowlist estricta de orígenes (verificado: solo acepta
-`http://localhost:5173` y `http://127.0.0.1:5173`; cualquier otro origen recibe
-`OPTIONS → 400` sin `Access-Control-Allow-Origin`). Por eso:
+El backend original tenía allowlist estricta de orígenes (verificado: solo aceptaba
+`http://localhost:5173` y `http://127.0.0.1:5173`; cualquier otro origen recibía
+`OPTIONS → 400` sin `Access-Control-Allow-Origin`). Con `api2.nikko.dev` y CORS
+permisivo (sección anterior) el directo funciona desde cualquier origen. De todos
+modos el proxy queda como respaldo:
 
 - en dev usa **exactamente el puerto 5173** (`strictPort` está activado para que
   Astro no salte en silencio a otro puerto, que fallaría por CORS);

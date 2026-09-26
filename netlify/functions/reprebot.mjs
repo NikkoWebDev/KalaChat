@@ -7,7 +7,7 @@
 //
 // La clave personal (X-Api-Key) viaja solo navegador→función→backend.
 
-const BASE = (process.env.REPREBOT_BASE_URL || 'https://reprebot-api.onrender.com').replace(/\/+$/, '')
+const BASE = (process.env.REPREBOT_BASE_URL || 'https://api2.nikko.dev').replace(/\/+$/, '')
 
 export default async (req) => {
   if (req.method !== 'POST') {
