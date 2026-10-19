@@ -11,15 +11,15 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2318514A'/%3E%3Cpath d='M32 12l5.2 12.8L50 30l-12.8 5.2L32 48l-5.2-12.8L14 30l12.8-5.2z' fill='%23F6EEE8'/%3E%3C/svg%3E",
+      "src": "/logo-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2318514A'/%3E%3Cpath d='M32 12l5.2 12.8L50 30l-12.8 5.2L32 48l-5.2-12.8L14 30l12.8-5.2z' fill='%23F6EEE8'/%3E%3C/svg%3E",
+      "src": "/logo-512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "maskable"
     }
   ]

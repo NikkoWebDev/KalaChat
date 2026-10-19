@@ -444,7 +444,7 @@
   .lanzador:hover { transform: translateY(-2px); box-shadow: var(--glass-shadow-lg) }
 
   /* --- Marca --- */
-  .brand-mark { background: linear-gradient(135deg, var(--c-unal-claro), var(--c-unal-verde)); color: var(--c-noche) }
+  .brand-mark { background: transparent; color: var(--c-noche) }
 
   .texto-grad {
     background: linear-gradient(120deg, var(--acento), var(--acento-2) 55%, var(--c-dorado));

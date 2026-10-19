@@ -1,8 +1,18 @@
-const CACHE = 'reprebot-v1'
-const ESENCIALES = ['/', '/manifest.json']
+const CACHE = 'reprebot-v2'
+const ESENCIALES = ['/', '/manifest.json', '/logo.png', '/logo-64.png', '/logo-192.png']
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ESENCIALES)))
+  e.waitUntil(
+    caches.open(CACHE).then((cache) =>
+      // Tolerate individual failures: a single 404 must not kill the install.
+      Promise.allSettled(
+        ESENCIALES.map(async (url) => {
+          const r = await fetch(new Request(url, { cache: 'reload' }))
+          if (r.ok) await cache.put(url, r)
+        })
+      )
+    )
+  )
   self.skipWaiting()
 })
 
